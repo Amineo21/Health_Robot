@@ -6,7 +6,7 @@
 
 # 1. Vision
 
- Un robot autonome basé sur ROS2 capable d’assister les infirmiers en EHPAD en livrant de manière sécurisée les médicaments et les plateaux-repas aux patients, afin d’optimiser le temps du personnel et améliorer la qualité des soins.
+ Un robot autonome basé sur ROS2 capable d’assister le personnel soignant de l'EHPAD (aide-soignant, agent de soin) en livrant le matériel(gants,serviettes, etc, ...) et les plateaux-repas aux patients, afin d’optimiser le temps du personnel et améliorer la qualité des soins.
 
 ---
 
@@ -14,10 +14,10 @@
 
 ## Objectifs
 
-1. Permettre la livraison autonome de médicaments et de repas
-2. Permettre à l’infirmier de commander le robot via une interface web (tablette ou telephone mobile)
-3. Permettre une communication temps réel le suivi du robot
-4. Suivi de la position du robot en temps réel et de sa navigation
+1. Permettre la livraison autonome des repas et du matériel
+2. Permettre au personnel soignant de commander le robot via une interface web (tablette ou telephone mobile)
+3. Permettre une communication temps réel pour le suivi du robot (Batterie faible, collisions avec patients ou personnel)
+4. Suivi de la position du robot en temps réel et de sa navigation pour conaitre sa progression dans sa tâche
 ---
 ## Objectifs secondaires
 
@@ -41,7 +41,7 @@ Age : 34 ans
 
 Objectifs :
 
-- Livrer médicaments rapidement
+- Livrer le materiel manquant rapidement
 - Réduire déplacements
 
 Utilise :
@@ -60,6 +60,10 @@ Objectifs :
 - Livrer repas efficacement
 - Surveiller robot
 
+Utilise :
+
+- Interface web pour commander et surveiller robot
+
 ---
 
 # 3. Use Cases
@@ -68,7 +72,7 @@ Objectifs :
 
 |ID|Nom|Acteur|Description|
 |---|---|---|---|
-|UC-01|Livrer médicament|Infirmier|Robot livre médicament|
+|UC-01|Livrer materiel|personnel soignant|Robot livre materiel|
 |UC-02|Livrer repas|Personnel|Robot livre repas|
 |UC-03|Navigation autonome|Robot|Robot se déplace seul|
 |UC-04|Éviter obstacles|Robot|Robot évite obstacles|
@@ -77,9 +81,9 @@ Objectifs :
 
 ---
 
-## UC-01 : Livrer médicament (détaillé)
+## UC-01 : Livrer materiel (détaillé)
 
-Acteur : Infirmier
+Acteur : personnel soignant
 
 Préconditions :
 
@@ -90,7 +94,7 @@ Préconditions :
 
 Scénario nominal :
 
-1. Infirmier sélectionne chambre
+1. personnel soignant sélectionne chambre
 
 2. Interface envoie commande
 
@@ -98,7 +102,7 @@ Scénario nominal :
 
 4. Robot navigue
 
-5. Robot livre médicament
+5. Robot livre materiel
 
 6. Robot envoie confirmation
 
@@ -121,7 +125,7 @@ Processus identique au UC-01.
 Architecture globale :
 
 ```
-Infirmier
+personnel soignant
    │
    ▼
 Interface Web
@@ -262,22 +266,23 @@ trash_node
 
 # 11. Roadmap
 
-|Phase|Objectif|
-|---|---|
-|Phase 1|Installation ROS2|
-|Phase 2|Navigation autonome|
-|Phase 3|Communication MQTT|
-|Phase 4|Interface|
-|Phase 5|Livraison|
-|Phase 6|Sortie poubelles|
+| Phase | Dates | 🎯 Objectifs | 📦 Livrables | 🛠️ Tâches | ✔️ Critères de validation | ⚠️ Risques spécifiques |
+|-------|--------|--------------|--------------|------------|---------------------------|-------------------------|
+| **Phase 1 — Installation ROS2, mise en place et préparation du robot** | 23/02/2026 → 08/03/2026 | - Préparer l’environnement logiciel et matériel du robot. <br> - Vérifier le bon fonctionnement des capteurs (Lidar, caméras, IMU). <br> - Installer ROS2 + packages essentiels. <br> - Mettre en place l’architecture de base des nodes. | - Robot opérationnel avec ROS2 Humble/Foxy installé. <br> - Drivers Lidar + caméra fonctionnels. <br> - Arborescence ROS2 du projet créée. <br> - Tests de communication MQTT simples. | - Installation ROS2 sur Jetson Nano / Orin NX. <br> - Configuration réseau (WiFi, IP fixe, SSH). <br> - Installation des drivers capteurs. <br> - Test des topics ROS2 (/scan, /camera, /imu). <br> - Mise en place du broker MQTT (Mosquitto). <br> - Création des premiers nodes : mqtt_node, safety_node. | - Tous les capteurs publient correctement. <br> - Le robot répond aux commandes simples (ping MQTT). <br> - Aucun crash ROS2 au démarrage. | — |
+| **Phase 2 — Navigation autonome (Nav2)** | 09/03/2026 → 22/03/2026 | - Permettre au robot de se déplacer sans télécommande. <br> - Générer une carte de l’EHPAD (SLAM). <br> - Configurer Nav2 pour la navigation autonome. | - Carte SLAM complète de l’environnement. <br> - Navigation autonome fonctionnelle (point A → point B). <br> - Évitement d’obstacles basique. | - Installation Nav2 + configuration des plugins. <br> - Calibration du Lidar + tests de scan. <br> - SLAM avec slam_toolbox. <br> - Configuration du planner global/local. <br> - Tests de navigation dans couloirs. <br> - Implémentation du node obstacle_avoidance_node. | - Le robot atteint une destination sans intervention humaine. <br> - Le robot évite les obstacles statiques. <br> - La carte est stable et exploitable. | - Mauvaise calibration Lidar → navigation instable. <br> - Mauvaise luminosité → vision perturbée. |
+| **Phase 3 — Communication interface ↔ robot (MQTT + WebSocket)** | 23/03/2026 → 05/04/2026 | - Permettre au personnel d’envoyer des commandes depuis l’interface. <br> - Assurer un retour d’état temps réel du robot. | - API WebSocket fonctionnelle. <br> - Topics MQTT définis et documentés. <br> - Node ROS2 delivery_node capable de recevoir une commande. | - Définition du protocole MQTT (topics, payload JSON). <br> - Développement du mqtt_node (publish/subscribe). <br> - Mise en place du serveur WebSocket. <br> - Tests de bout en bout : Interface → MQTT → ROS2 → robot. | - Une commande envoyée depuis l’interface déclenche un déplacement réel. <br> - Le robot renvoie son état (batterie, position, statut). | — |
+| **Phase 4 — Interface Web (React)** | 06/04/2026 → 19/04/2026 | - Créer une interface simple et accessible pour le personnel soignant. <br> - Permettre la sélection des chambres et des tâches. | - Interface React responsive (tablette + mobile). <br> - Dashboard de suivi du robot. <br> - Page de sélection des tâches (livraison matériel, repas). | - Maquettage UI/UX (Figma). <br> - Développement des pages principales. <br> - Intégration WebSocket. <br> - Affichage de la carte du robot (optionnel). <br> - Tests utilisateurs (personnel soignant). | - Le personnel peut commander une livraison sans formation technique. <br> - Le robot apparaît en temps réel dans l’interface. | — |
+| **Phase 5 — Livraison (tests unitaires + fonctionnels)** | 20/04/2026 → 03/05/2026 | - Finaliser la fonctionnalité de livraison. <br> - Tester la fiabilité du système dans un scénario réel. | - Livraison matériel opérationnelle. <br> - Livraison repas opérationnelle. <br> - Rapport de tests. | - Tests unitaires ROS2 (nodes). <br> - Tests fonctionnels : commande → déplacement → livraison → confirmation. <br> - Gestion des erreurs (collision, batterie faible). <br> - Optimisation de la vitesse et trajectoires. | - 95% des livraisons réussies sans intervention humaine. <br> - Aucun incident de sécurité. | — |
+| **Phase 6 — Sortie poubelles (optionnelle)** | 04/05/2026 → 17/05/2026 | - Ajouter une fonctionnalité secondaire si le temps le permet. | - Node trash_node. <br> - Parcours prédéfini vers la zone poubelles. | - Définition du workflow (départ → collecte → dépôt). <br> - Ajout d’un mode “poubelles” dans l’interface. <br> - Tests de navigation avec charge légère. | - Le robot peut transporter une petite poubelle sans risque. <br> - Le personnel peut déclencher la tâche depuis l’interface. | — |
+
 
 ---
 
 # 12. Questions ouvertes
 
--  Faut-il ajouter reconnaissance QR code ?
--  Faut-il ajouter IA détection personnes ?
--  Faut-il ajouter multi-robots ?
+-  Faut-il ajouter une reconnaissance via QR code ?
+-  Faut-il ajouter l'IA détection personnes ?
+-  Faut-il créer une flotte dans l'idéal ?
 
 ---
 
@@ -285,16 +290,16 @@ trash_node
 
 Robot capable de :
 
-- recevoir commandes
+- recevoir les commandes données par le personnel soignant
 
-- naviguer autonome
+- déplacements autonomes
 
-- éviter obstacles
+- éviter les obstacles
 
-- livrer médicaments
+- livrer le matériel
 
-- livrer repas
+- livrer les repas
 
-- communiquer temps réel
+- communiquer temps réel (suivi du robot)
 
-- sortir poubelles (optionnel)
+
