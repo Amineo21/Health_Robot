@@ -1,39 +1,41 @@
 # Projet : Robot intelligent d'assistance pour EHPAD
 
+  
+# Robot : ROSMASTER M3 Pro -- ROS2 -- Jetson Nano / Orin NX
 
+  
 
 ------------------------------------------------------------------------
 # 1. Vision
 
+  
 
 Développer un robot autonome basé sur ROS2 capable d'assister les
 
 infirmiers en EHPAD en livrant de manière sécurisée les médicaments et
 
-les plateaux-repas aux patients, afin d'optimiser le temps du personnel
+les plateaux-repas aux patients, grâce à un système connecté utilisant
 
-soignant et améliorer la qualité des soins.
-
-
-------------------------------------------------------------------------
-
-
-# 2. Objectifs et périmètre
+MQTT et WebSocket pour la communication temps réel.
 
   
 
-## Objectifs
+------------------------------------------------------------------------
 
+# 2. Objectifs et périmètre
 
-1.  Développer un robot autonome capable de se déplacer dans un EHPAD
+## Objectifs principaux
 
-2.  Permettre la livraison sécurisée de médicaments et de repas
+  
+1.  Permettre au robot de livrer des médicaments et des plateaux-repas
 
-3.  Fournir une interface permettant au personnel de commander le robot
+2.  Permettre à l'infirmier de commander le robot via une interface
 
-4.  Assurer la sécurité des patients et du personnel
+3.  Permettre une communication temps réel entre interface et robot
 
-5.  Envoyer la position du robot en temps réel
+4.  Permettre au robot de naviguer de manière autonome
+
+5.  Permettre au robot d'éviter les obstacles
 
   
 
@@ -41,23 +43,11 @@ soignant et améliorer la qualité des soins.
 
   
 
-1.  Ajouter une fonctionnalité de sortie des poubelles (optionnel)
+1.  Sortie des poubelles (fonctionnalité optionnelle)
 
-2.  Ajouter un système de notification de livraison
+2.  Surveillance via caméra
 
-3.  Ajouter une caméra pour surveillance et navigation
-
-  
-
-## Non-objectifs
-
-  
-
-1.  Remplacer complètement le personnel soignant
-
-2.  Transporter des charges lourdes (\>5kg)
-
-3.  Utilisation en extérieur
+3.  Suivi en temps réel de la position
 
   
 
@@ -65,25 +55,13 @@ soignant et améliorer la qualité des soins.
 
   
 
-# 3. Use Cases
+# 3. Architecture globale du système
 
   
 
-  ID      Nom                           Acteur      Description
+Infirmier → Interface → WebSocket → Serveur MQTT → MQTT → Robot
 
-  ------- ----------------------------- ----------- ------------------------
-
-  UC-01   Livrer médicament             Infirmier   Robot livre médicament
-
-  UC-02   Livrer repas                  Personnel   Robot livre repas
-
-  UC-03   Navigation autonome           Robot       Se déplace seul
-
-  UC-04   Éviter obstacles              Robot       Évite personnes
-
-  UC-05   Retour base                   Robot       Retour automatique
-
-  UC-06   Sortir poubelle (optionnel)   Personnel   Transport déchets
+ROSMASTER M3 Pro
 
   
 
@@ -91,11 +69,73 @@ soignant et améliorer la qualité des soins.
 
   
 
-# 4. Architecture Technique
+# 4. Composants Robot
 
   
 
-    Interface Web → WiFi → Robot ROSMASTER M3 Pro → ROS2 → Capteurs / Lidar / Caméra
+## Navigation
+
+  
+
+navigation_node\
+
+delivery_node
+
+  
+
+## Évitement obstacles
+
+  
+
+Dual ToF Lidar\
+
+Caméra RGB-D
+
+  
+
+Nodes:
+
+  
+
+obstacle_avoidance_node\
+
+safety_node
+
+  
+
+## Vision
+
+  
+
+OpenCV\
+
+vision_node
+
+  
+
+------------------------------------------------------------------------
+
+# 5. Interface
+
+  
+
+Technologies:
+
+  
+
+React\
+
+WebSocket
+
+  
+
+Fonctions:
+
+  
+
+-   commander robot\
+
+-   recevoir statut
 
   
 
@@ -103,37 +143,33 @@ soignant et améliorer la qualité des soins.
 
   
 
-# 5. Stack Technique
+# 6. Serveur MQTT
 
   
 
-## Robot
+Fonctions:
 
   
 
--   ROSMASTER M3 Pro
+-   recevoir commandes
 
--   ROS2
+-   envoyer commandes robot
 
--   Jetson Nano / Orin NX
+-   recevoir statut robot
 
--   Ubuntu
-
-  
-
-## Software
+-   envoyer statut interface
 
   
 
--   Python
+Topics:
 
--   ROS2 Nodes
+  
 
--   React
+robot/command\
 
--   MQTT / WebSocket
+robot/status\
 
--   OpenCV
+robot/location
 
   
 
@@ -141,43 +177,15 @@ soignant et améliorer la qualité des soins.
 
   
 
-# 6. Fonctionnalités principales
+# 7. Communication
 
   
 
-## Obligatoires
+Interface → WebSocket → MQTT → Robot
 
   
 
--   Navigation autonome
-
--   Livraison médicaments
-
--   Livraison repas
-
--   Évitement obstacles
-
--   Retour automatique
-
-  
-
-## Optionnelle
-  
-### Sortie des poubelles
-
-  Objectif : Permettre au robot de transporter les déchets vers une zone définie.
-
-Fonctionnement :
-
-  
-
-1.  Chargement des déchets
-
-2.  Navigation vers zone déchets
-
-3.  Déchargement
-
-4.  Retour base
+Robot → MQTT → WebSocket → Interface
 
   
 
@@ -185,71 +193,47 @@ Fonctionnement :
 
   
 
-# 7. Architecture ROS2
+# 8. Stack Technique
 
   
 
-Nodes :
+Robot:
 
   
 
--   navigation_node
+ROS2\
 
--   delivery_node
+Python\
 
--   safety_node
+Jetson Nano / Orin NX\
 
--   vision_node
-
--   interface_node
-
--   trash_node (optionnel)
+Ubuntu
 
   
 
-------------------------------------------------------------------------
+Vision:
 
   
 
-# 8. Risques
+OpenCV
 
   
 
-  Risque              Impact   Solution
-
-  ------------------- -------- ----------
-
-  Collision           Élevé    Lidar
-
-  Bug ROS             Moyen    Tests
-
-  Erreur navigation   Moyen    SLAM
+Communication:
 
   
 
-------------------------------------------------------------------------
+MQTT\
+
+WebSocket
 
   
 
-# 9. Roadmap
+Interface:
 
   
 
-  Phase     Objectif
-
-  --------- -------------------
-
-  Phase 1   Installation ROS2
-
-  Phase 2   Navigation
-
-  Phase 3   Livraison
-
-  Phase 4   Interface
-
-  Phase 5   Tests
-
-  Phase 6   Fonction poubelle
+React
 
   
 
@@ -257,23 +241,19 @@ Nodes :
 
   
 
-# 10. Résultat attendu
+# 9. Use Cases
 
   
 
-Robot capable de :
+Livrer médicament\
 
-  
+Livrer repas\
 
--   Naviguer seul
+Navigation autonome\
 
--   Livrer médicaments
+Évitement obstacles\
 
--   Livrer repas
-
--   Retourner base
-
--   Optionnel : sortir poubelle
+Sortie poubelles (optionnel)
 
   
 
@@ -281,24 +261,92 @@ Robot capable de :
 
   
 
-# 11. Structure du projet
+# 10. Architecture ROS2
 
   
 
-    robot-boy/
+Nodes:
 
-    │
+  
 
-    ├── docs/
+navigation_node\
 
-    │   └── cdc-technique.md
+delivery_node\
 
-    │
+vision_node\
 
-    ├── ros2_ws/
+obstacle_avoidance_node\
 
-    ├── interface/
+mqtt_node\
 
-    ├── backend/
+interface_node\
 
-    └── README.md
+safety_node\
+
+trash_node (optionnel)
+
+  
+
+------------------------------------------------------------------------
+
+  
+
+# 11. Sécurité
+
+  
+
+Détection obstacles\
+
+Arrêt urgence\
+
+Surveillance capteurs
+
+  
+
+------------------------------------------------------------------------
+
+  
+
+# 12. Roadmap
+
+  
+
+Phase 1: installation ROS2\
+
+Phase 2: navigation\
+
+Phase 3: communication MQTT\
+
+Phase 4: interface\
+
+Phase 5: livraison\
+
+Phase 6: sortie poubelles
+
+  
+
+------------------------------------------------------------------------
+
+  
+
+# 13. Résultat attendu
+
+  
+
+Robot capable de:
+
+  
+
+-   recevoir commandes
+
+-   naviguer autonome
+
+-   éviter obstacles
+
+-   livrer médicaments
+
+-   livrer repas
+
+-   communiquer temps réel
+
+-   sortir poubelles (optionnel)
