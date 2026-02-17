@@ -143,9 +143,9 @@ Robot ROSMASTER M3 Pro
 # 5. Diagrammes UML :
 
 
-![[Pasted image 20260217150427.png]]
+![Diagramme d’architecture](Images/Pasted%20image%2020260217150427.png)
 
-![[Pasted image 20260217152148.png]]
+![Diagramme de séquence](images/Pasted%20image%2020260217152148.png)
 
 ---
 
