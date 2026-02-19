@@ -453,48 +453,61 @@ Robot retourne vers sa base de charge
 - Maintenance physique du robot
 - Vérification sécurité
 - Redémarrage contrôlé via interface admin
-
 ---
 
 # 4. Architecture technique détaillée
 
 ## 4.1 Architecture globale
 
-
-
-# 4. Architecture technique
-
-Architecture globale :
-
-
-personnel soignant
-   │
-   ▼
-Interface Web
-   │ WebSocket
-   ▼
-Serveur MQTT
-   │ MQTT
-   ▼
-Robot ROSMASTER M3 Pro
-   │
-   ├── Navigation (ROS2 Nav2)
-   ├── Vision (OpenCV)
-   ├── Lidar Dual ToF
-   └── Capteurs sécurité
-
-
----
-
-# 5. Diagrammes UML :
-
-
-![Diagramme d’architecture](Images/Pasted%20image%2020260217150427.png)
-
-![Diagramme de séquence](Images/Pasted%20image%2020260217152148.png)
-
----
-
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    INTERFACE WEB (React)                         │
+│              Tablette / Téléphone Mobile Personnel              │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │ WebSocket (port 8080)
+                           │
+┌──────────────────────────▼──────────────────────────────────────┐
+│                  SERVEUR COMMUNICATION                          │
+│          (Node.js + WebSocket + MQTT Client)                   │
+│                   ↑                    ↑                        │
+│              REST API          Historique/Logs                 │
+└──────┬─────────────────────────┬───────────────────────────────┘
+       │ MQTT Pub/Sub             │
+       │ (Port 1883)              │
+       │                          │
+┌──────▼──────────────────────────▼──────────────────────────────┐
+│                    BROKER MQTT (Mosquitto)                     │
+│    Topics: /robot/commands, /robot/status, /robot/telemetry  │
+└──────────────────────────┬───────────────────────────────────┘
+                           │ MQTT
+                           │
+┌──────────────────────────▼───────────────────────────────────┐
+│              ROBOT ROS2 (ROSMASTER M3 Pro)                   │
+│                  Jetson Nano / Orin NX                       │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │        ROS2 NODES (C++)                            │ │
+│  │                                                        │ │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌────────────┐  │ │
+│  │  │ mqtt_node    │  │nav2_node     │  │vision_node │  │ │
+│  │  │              │  │              │  │ (OpenCV)   │  │ │
+│  │  └──────────────┘  └──────────────┘  └────────────┘  │ │
+│  │                                                        │ │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌────────────┐  │ │
+│  │  │obstacle_avo │  │delivery_node │  │safety_node │  │ │
+│  │  │dance_node   │  │              │  │ (heartbeat)│  │ │
+│  │  └──────────────┘  └──────────────┘  └────────────┘  │ │
+│  │                                                        │ │
+│  └────────────────────────────────────────────────────────┘ │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │              HARDWARE DRIVERS                          │ │
+│  │                                                        │ │
+│  │  Lidar × 2    Caméra  USB    IMU    Moteurs   Encodeurs│
+│  │  (ToF)        (USB)          (I2C)  (PWM)     (GPIOs)  │ │
+│  │                                                        │ │
+│  └────────────────────────────────────────────────────────┘ │
+└────────────────────────────────────────────────────────────┘
 # 6. Stack technique
 
 |Composant|Technologie|Justification|
