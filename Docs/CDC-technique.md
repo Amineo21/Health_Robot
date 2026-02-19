@@ -459,55 +459,11 @@ Robot retourne vers sa base de charge
 
 ## 4.1 Architecture globale
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    INTERFACE WEB (React)                         │
-│              Tablette / Téléphone Mobile Personnel              │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │ WebSocket (port 8080)
-                           │
-┌──────────────────────────▼──────────────────────────────────────┐
-│                  SERVEUR COMMUNICATION                          │
-│          (Node.js + WebSocket + MQTT Client)                   │
-│                   ↑                    ↑                        │
-│              REST API          Historique/Logs                 │
-└──────┬─────────────────────────┬───────────────────────────────┘
-       │ MQTT Pub/Sub             │
-       │ (Port 1883)              │
-       │                          │
-┌──────▼──────────────────────────▼──────────────────────────────┐
-│                    BROKER MQTT (Mosquitto)                     │
-│    Topics: /robot/commands, /robot/status, /robot/telemetry  │
-└──────────────────────────┬───────────────────────────────────┘
-                           │ MQTT
-                           │
-┌──────────────────────────▼───────────────────────────────────┐
-│              ROBOT ROS2 (ROSMASTER M3 Pro)                   │
-│                  Jetson Nano / Orin NX                       │
-│                                                              │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │        ROS2 NODES (C++)                            │ │
-│  │                                                        │ │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌────────────┐  │ │
-│  │  │ mqtt_node    │  │nav2_node     │  │vision_node │  │ │
-│  │  │              │  │              │  │ (OpenCV)   │  │ │
-│  │  └──────────────┘  └──────────────┘  └────────────┘  │ │
-│  │                                                        │ │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌────────────┐  │ │
-│  │  │obstacle_avo │  │delivery_node │  │safety_node │  │ │
-│  │  │dance_node   │  │              │  │ (heartbeat)│  │ │
-│  │  └──────────────┘  └──────────────┘  └────────────┘  │ │
-│  │                                                        │ │
-│  └────────────────────────────────────────────────────────┘ │
-│                                                              │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │              HARDWARE DRIVERS                          │ │
-│  │                                                        │ │
-│  │  Lidar × 2    Caméra  USB    IMU    Moteurs   Encodeurs│
-│  │  (ToF)        (USB)          (I2C)  (PWM)     (GPIOs)  │ │
-│  │                                                        │ │
-│  └────────────────────────────────────────────────────────┘ │
-└────────────────────────────────────────────────────────────┘
+![Diagramme d’architecture](Images/Pasted%20image%2020260217150427.png)
+
+![Diagramme de séquence](Images/Pasted%20image%2020260217152148.png)
+
+
 # 6. Stack technique
 
 |Composant|Technologie|Justification|
@@ -631,7 +587,7 @@ trash_node
 | **Phase 3 — Communication interface ↔ robot (MQTT + WebSocket)** | 09/03/2026 → 15/03/2026 | - Permettre au personnel d’envoyer des commandes depuis l’interface. <br> - Assurer un retour d’état temps réel du robot. | - API WebSocket fonctionnelle. <br> - Topics MQTT définis et documentés. <br> - Node ROS2 delivery_node capable de recevoir une commande. | - Définition du protocole MQTT (topics, payload JSON). <br> - Développement du mqtt_node (publish/subscribe). <br> - Mise en place du serveur WebSocket. <br> - Tests de bout en bout : Interface → MQTT → ROS2 → robot. | - Une commande envoyée depuis l’interface déclenche un déplacement réel. <br> - Le robot renvoie son état (batterie, position, statut). | — |
 | **Phase 4 — Interface Web (React)** | 16/03/2026 → 22/03/2026 | - Créer une interface simple et accessible pour le personnel soignant. <br> - Permettre la sélection des chambres et des tâches. | - Interface React responsive (tablette + mobile). <br> - Dashboard de suivi du robot. <br> - Page de sélection des tâches (livraison matériel, repas). | - Maquettage UI/UX (Figma). <br> - Développement des pages principales. <br> - Intégration WebSocket. <br> - Affichage de la carte du robot (optionnel). <br> - Tests utilisateurs (personnel soignant). | - Le personnel peut commander une livraison sans formation technique. <br> - Le robot apparaît en temps réel dans l’interface. | — |
 | **Phase 5 — Livraison (tests unitaires + fonctionnels)** | 23/03/2026 → 29/03/2026 | - Finaliser la fonctionnalité de livraison. <br> - Tester la fiabilité du système dans un scénario réel. | - Livraison matériel opérationnelle. <br> - Livraison repas opérationnelle. <br> - Rapport de tests. | - Tests unitaires ROS2 (nodes). <br> - Tests fonctionnels : commande → déplacement → livraison → confirmation. <br> - Gestion des erreurs (collision, batterie faible). <br> - Optimisation de la vitesse et trajectoires. | - 95% des livraisons réussies sans intervention humaine. <br> - Aucun incident de sécurité. | — |
-| **Phase 6 — Sortie poubelles (optionnelle)** | 30/03/2026 → 05/03/2026 | - Ajouter une fonctionnalité secondaire si le temps le permet. | - Node trash_node. <br> - Parcours prédéfini vers la zone poubelles. | - Définition du workflow (départ → collecte → dépôt). <br> - Ajout d’un mode “poubelles” dans l’interface. <br> - Tests de navigation avec charge légère. | - Le robot peut transporter une petite poubelle sans risque. <br> - Le personnel peut déclencher la tâche depuis l’interface. | — |
+| **Phase 6 — Commanddes vocal (optionnelle)** | 30/03/2026 → 05/03/2026 | - Ajouter une fonctionnalité secondaire si le temps le permet. | -  <br> - Commande vocale | - Définition du workflow (Demande vocal → Reception → Execution). <br> - Ajout d’un mode “Vocale” dans l’interface. <br> - Tests de la fonctionnalité avec mots-clès | - Le robot comprend et execute la demande faite <br> - Le personnel peut déclencher la tâche depuis l’interface juste avec la voix. | — |
 
 
 ---
