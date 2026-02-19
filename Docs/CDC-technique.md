@@ -462,13 +462,13 @@ Robot retourne vers sa base de charge
 
 ## 4.1 Architecture globale
 
-```
+
 
 # 4. Architecture technique
 
 Architecture globale :
 
-```
+
 personnel soignant
    │
    ▼
@@ -484,7 +484,7 @@ Robot ROSMASTER M3 Pro
    ├── Vision (OpenCV)
    ├── Lidar Dual ToF
    └── Capteurs sécurité
-```
+
 
 ---
 
