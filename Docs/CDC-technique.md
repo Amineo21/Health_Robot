@@ -21,7 +21,7 @@
 ---
 ## Objectifs secondaires
 
-1. Sortie des poubelles (fonctionnalité optionnelle)
+1. Commande vocal (fonctionnalité optionnelle)
 ---
 
 ## Non-objectifs
@@ -77,7 +77,9 @@ Utilise :
 |UC-03|Navigation autonome|Robot|Robot se déplace seul|
 |UC-04|Éviter obstacles|Robot|Robot évite obstacles|
 |UC-05|Retour base|Robot|Robot retourne base|
-|UC-06|Sortie poubelle|Personnel|Robot transporte déchets|
+|UC-06|Commande vocal|Personnel|Robot reçoit des commande via l'option vocal(optionnel)|BASSE|
+|UC-07|Batterie faible|Robot|Alerte et retour automatique|MOYENNE|
+|UC-08|Mode d'urgence|Utilisateur|Arrêt immédiat du robot|
 
 ---
 
@@ -94,17 +96,41 @@ Préconditions :
 
 Scénario nominal :
 
-1. personnel soignant sélectionne chambre
+Le personnel soignant accède à l'interface Web depuis sa tablette ou son téléphone
 
-2. Interface envoie commande
+Authentification du personnel soignant
 
-3. Serveur MQTT transmet commande
+Sélection du type de matériel à livrer (gants, serviettes, pansements, etc.)
 
-4. Robot navigue
+Sélection de la chambre destination à l'aide de un QR code (ex: "Chambre 302")
 
-5. Robot livre materiel
+Confirmation de la commande
 
-6. Robot envoie confirmation
+Interface envoie commande via WebSocket au serveur
+
+Serveur valide la commande et la publie sur le topic MQTT /robot/tasks
+
+Robot reçoit la commande et valide la tâche
+
+Robot met à jour son état à "En route vers Chambre 302"
+
+Interface Web met à jour l'affichage en temps réel (position, étape)
+
+Robot navigue autonomement vers la chambre (utilisant Nav2 + Lidar)
+
+Robot arrive à la chambre et s'arrête
+
+Robot annonce l'arrivée (signal sonore, LED clignotante)
+
+Robot attend que le matériel soit retiré (capteur de charge)
+
+Une fois matériel retiré, robot met à jour l'état à "Livraison complète"
+
+Robot envoie confirmation à l'interface
+
+Interface notifie l'utilisateur "Livraison réussie"
+
+Robot retourne vers sa base de charge
 
 
 Postconditions :
@@ -165,6 +191,7 @@ Robot ROSMASTER M3 Pro
 |Communication|WebSocket|Communication temps réel|
 |Interface|React|Interface moderne|
 |Navigation|Nav2|Navigation autonome|
+| Application mobile   | PWA (React)| Installation tablette/mobile sans store |
 
 ---
 
@@ -220,6 +247,8 @@ Mesures :
 - Surveillance capteurs
 
 - Vision OpenCV
+
+- Vitesse adaptative selon zone(optionnel)
 
 ---
 
@@ -283,6 +312,8 @@ trash_node
 -  Faut-il ajouter une reconnaissance via QR code ?
 -  Faut-il ajouter l'IA détection personnes ?
 -  Faut-il créer une flotte dans l'idéal ?
+- Faut-il adapter le comportement du robot selon les zones (chambres / couloirs) ?
+- Quel niveau de supervision est acceptable pour le personnel ?
 
 ---
 
