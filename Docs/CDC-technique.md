@@ -283,10 +283,10 @@ Robot retourne vers sa base de charge
 - Interface mise à jour
 
 **Critères d'acceptation :**
-- ✅ Livraison réussit 95% des cas nominaux
-- ✅ Temps total < 3 minutes (de l'ordre, à la livraison)
-- ✅ Navigation sans collision
-- ✅ Confirmations envoyées en < 1 seconde
+- Livraison réussit 95% des cas nominaux
+- Temps total < 3 minutes (de l'ordre, à la livraison)
+- Navigation sans collision
+- Confirmations envoyées en < 1 seconde
 
 ---
 
