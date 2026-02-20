@@ -6,7 +6,7 @@
 
 # 1. Vision
 
-Un robot autonome et intelligent basé sur ROS2 capable d'assister le personnel soignant de l'EHPAD (aide-soignant, agent de soin) en livrant le matériel (gants, serviettes, pansements, etc.) et les plateaux-repas aux patients, afin d'optimiser le temps du personnel et améliorer la qualité et la réactivité des soins.
+Un robot autonome et intelligent capable d'assister le personnel soignant de l'EHPAD (aide-soignant, agent de soin) en livrant le matériel (gants, serviettes, pansements, etc.) et les plateaux-repas aux patients, afin d'optimiser le temps du personnel et améliorer la qualité et la réactivité des soins.
 
 ## Contexte et justification
 
@@ -60,7 +60,6 @@ Les EHPAD font face à une charge de travail croissante avec un personnel limit�
    - Reconnaissance des numéros de chambre par QR code / OCR
    - Détection des personnes avec IA (pour évitement amélioré)
    - Gestion de flotte multi-robots coordonnés
-   - Système de réservation des créneaux robot
 
 ---
 
@@ -85,7 +84,6 @@ Les EHPAD font face à une charge de travail croissante avec un personnel limit�
 - Logging et traçabilité des livraisons
 
 ### Exclus
-- Système de paiement
 - Téléconférence vidéo depuis le robot
 - Contrôle des lumières / équipements EHPAD
 - Gestion des stocks automatisée
@@ -283,10 +281,10 @@ Robot retourne vers sa base de charge
 - Interface mise à jour
 
 **Critères d'acceptation :**
-- ✅ Livraison réussit 95% des cas nominaux
-- ✅ Temps total < 3 minutes (de l'ordre, à la livraison)
-- ✅ Navigation sans collision
-- ✅ Confirmations envoyées en < 1 seconde
+- Livraison réussit 95% des cas nominaux
+- Temps total < 3 minutes (de l'ordre, à la livraison)
+- Navigation sans collision
+- Confirmations envoyées en < 1 seconde
 
 ---
 
@@ -455,47 +453,16 @@ Robot retourne vers sa base de charge
 - Maintenance physique du robot
 - Vérification sécurité
 - Redémarrage contrôlé via interface admin
-
 ---
 
 # 4. Architecture technique détaillée
 
-## 4.1 Architecture globale
-
-```
-
-# 4. Architecture technique
-
-Architecture globale :
-
-```
-personnel soignant
-   │
-   ▼
-Interface Web
-   │ WebSocket
-   ▼
-Serveur MQTT
-   │ MQTT
-   ▼
-Robot ROSMASTER M3 Pro
-   │
-   ├── Navigation (ROS2 Nav2)
-   ├── Vision (OpenCV)
-   ├── Lidar Dual ToF
-   └── Capteurs sécurité
-```
-
----
-
-# 5. Diagrammes UML :
-
+## 4.1 Diagramme UML 
 
 ![Diagramme d’architecture](Images/Pasted%20image%2020260217150427.png)
 
 ![Diagramme de séquence](Images/Pasted%20image%2020260217152148.png)
 
----
 
 # 6. Stack technique
 
@@ -510,6 +477,7 @@ Robot ROSMASTER M3 Pro
 |Interface|React|Interface moderne|
 |Navigation|Nav2|Navigation autonome|
 | Application mobile   | PWA (React)| Installation tablette/mobile sans store |
+|Architecture/standardisation | Docker | Conteneurisation pour utiliser ROS2|
 
 ---
 
@@ -615,15 +583,12 @@ trash_node
 
 | Phase | Dates | 🎯 Objectifs | 📦 Livrables | 🛠️ Tâches | ✔️ Critères de validation | ⚠️ Risques spécifiques |
 |-------|--------|--------------|--------------|------------|---------------------------|-------------------------|
-| **Phase 1 — Installation ROS2, mise en place et préparation du robot** | 23/02/2026 → 08/03/2026 | - Préparer l’environnement logiciel et matériel du robot. <br> - Vérifier le bon fonctionnement des capteurs (Lidar, caméras, IMU). <br> - Installer ROS2 + packages essentiels. <br> - Mettre en place l’architecture de base des nodes. | - Robot opérationnel avec ROS2 Humble/Foxy installé. <br> - Drivers Lidar + caméra fonctionnels. <br> - Arborescence ROS2 du projet créée. <br> - Tests de communication MQTT simples. | - Installation ROS2 sur Jetson Nano / Orin NX. <br> - Configuration réseau (WiFi, IP fixe, SSH). <br> - Installation des drivers capteurs. <br> - Test des topics ROS2 (/scan, /camera, /imu). <br> - Mise en place du broker MQTT (Mosquitto). <br> - Création des premiers nodes : mqtt_node, safety_node. | - Tous les capteurs publient correctement. <br> - Le robot répond aux commandes simples (ping MQTT). <br> - Aucun crash ROS2 au démarrage. | — |
-| **Phase 2 — Navigation autonome (Nav2)** | 09/03/2026 → 22/03/2026 | - Permettre au robot de se déplacer sans télécommande. <br> - Générer une carte de l’EHPAD (SLAM). <br> - Configurer Nav2 pour la navigation autonome. | - Carte SLAM complète de l’environnement. <br> - Navigation autonome fonctionnelle (point A → point B). <br> - Évitement d’obstacles basique. | - Installation Nav2 + configuration des plugins. <br> - Calibration du Lidar + tests de scan. <br> - SLAM avec slam_toolbox. <br> - Configuration du planner global/local. <br> - Tests de navigation dans couloirs. <br> - Implémentation du node obstacle_avoidance_node. | - Le robot atteint une destination sans intervention humaine. <br> - Le robot évite les obstacles statiques. <br> - La carte est stable et exploitable. | - Mauvaise calibration Lidar → navigation instable. <br> - Mauvaise luminosité → vision perturbée. |
-| **Phase 3 — Communication interface ↔ robot (MQTT + WebSocket)** | 23/03/2026 → 05/04/2026 | - Permettre au personnel d’envoyer des commandes depuis l’interface. <br> - Assurer un retour d’état temps réel du robot. | - API WebSocket fonctionnelle. <br> - Topics MQTT définis et documentés. <br> - Node ROS2 delivery_node capable de recevoir une commande. | - Définition du protocole MQTT (topics, payload JSON). <br> - Développement du mqtt_node (publish/subscribe). <br> - Mise en place du serveur WebSocket. <br> - Tests de bout en bout : Interface → MQTT → ROS2 → robot. | - Une commande envoyée depuis l’interface déclenche un déplacement réel. <br> - Le robot renvoie son état (batterie, position, statut). | — |
-| **Phase 4 — Interface Web (React)** | 06/04/2026 → 19/04/2026 | - Créer une interface simple et accessible pour le personnel soignant. <br> - Permettre la sélection des chambres et des tâches. | - Interface React responsive (tablette + mobile). <br> - Dashboard de suivi du robot. <br> - Page de sélection des tâches (livraison matériel, repas). | - Maquettage UI/UX (Figma). <br> - Développement des pages principales. <br> - Intégration WebSocket. <br> - Affichage de la carte du robot (optionnel). <br> - Tests utilisateurs (personnel soignant). | - Le personnel peut commander une livraison sans formation technique. <br> - Le robot apparaît en temps réel dans l’interface. | — |
-| **Phase 5 — Livraison (tests unitaires + fonctionnels)** | 20/04/2026 → 03/05/2026 | - Finaliser la fonctionnalité de livraison. <br> - Tester la fiabilité du système dans un scénario réel. | - Livraison matériel opérationnelle. <br> - Livraison repas opérationnelle. <br> - Rapport de tests. | - Tests unitaires ROS2 (nodes). <br> - Tests fonctionnels : commande → déplacement → livraison → confirmation. <br> - Gestion des erreurs (collision, batterie faible). <br> - Optimisation de la vitesse et trajectoires. | - 95% des livraisons réussies sans intervention humaine. <br> - Aucun incident de sécurité. | — |
-| **Phase 6 — Sortie poubelles (optionnelle)** | 04/05/2026 → 17/05/2026 | - Ajouter une fonctionnalité secondaire si le temps le permet. | - Node trash_node. <br> - Parcours prédéfini vers la zone poubelles. | - Définition du workflow (départ → collecte → dépôt). <br> - Ajout d’un mode “poubelles” dans l’interface. <br> - Tests de navigation avec charge légère. | - Le robot peut transporter une petite poubelle sans risque. <br> - Le personnel peut déclencher la tâche depuis l’interface. | — |
-
-
----
+| **Phase 1 — Installation ROS2, mise en place et préparation du robot** | 23/02/2026 → 15/03/2026 (3 semaines) | - Préparer l'environnement logiciel et matériel du robot.<br>- Vérifier le bon fonctionnement des capteurs (Lidar, caméras, IMU).<br>- Installer ROS2 + packages essentiels.<br>- Mettre en place l'architecture de base des nodes. | - Robot opérationnel avec ROS2 Humble/Foxy installé.<br>- Drivers Lidar + caméra fonctionnels.<br>- Arborescence ROS2 du projet créée.<br>- Tests de communication MQTT simples. | - Installation ROS2 sur Jetson Nano / Orin NX.<br>- Configuration réseau (WiFi, IP fixe, SSH).<br>- Installation des drivers capteurs.<br>- Test des topics ROS2 (/scan, /camera, /imu).<br>- Mise en place du broker MQTT (Mosquitto).<br>- Création des premiers nodes : mqtt_node, safety_node. | - Tous les capteurs publient correctement.<br>- Le robot répond aux commandes simples (ping MQTT).<br>- Aucun crash ROS2 au démarrage. | — |
+| **Phase 2 — Navigation autonome (Nav2)** | 16/03/2026 → 26/04/2026 (6 semaines) | - Permettre au robot de se déplacer sans télécommande.<br>- Générer une carte de l'EHPAD (SLAM).<br>- Configurer Nav2 pour la navigation autonome. | - Carte SLAM complète de l'environnement.<br>- Navigation autonome fonctionnelle (point A → point B).<br>- Évitement d'obstacles basique. | - Installation Nav2 + configuration des plugins.<br>- Calibration du Lidar + tests de scan.<br>- SLAM avec slam_toolbox.<br>- Configuration du planner global/local.<br>- Tests de navigation dans couloirs.<br>- Implémentation du node obstacle_avoidance_node. | - Le robot atteint une destination sans intervention humaine.<br>- Le robot évite les obstacles statiques.<br>- La carte est stable et exploitable. | - Mauvaise calibration Lidar → navigation instable.<br>- Mauvaise luminosité → vision perturbée. |
+| **Phase 3 — Communication interface ↔ robot (MQTT + WebSocket)** | 27/04/2026 → 17/05/2026 (3 semaines) | - Permettre au personnel d'envoyer des commandes depuis l'interface.<br>- Assurer un retour d'état temps réel du robot. | - API WebSocket fonctionnelle.<br>- Topics MQTT définis et documentés.<br>- Node ROS delivery_node capable de recevoir une commande. | - Définition du protocole MQTT (topics, payload JSON).<br>- Développement du mqtt_node (publish/subscribe).<br>- Mise en place du serveur WebSocket.<br>- Tests de bout en bout : Interface → MQTT → ROS → robot. | - Une commande envoyée depuis l'interface déclenche un déplacement réel.<br>- Le robot renvoie son état (batterie, position, statut). | — |
+| **Phase 4 — Interface Web (React)** | 18/05/2026 → 07/06/2026 (3 semaines) | - Créer une interface simple et accessible pour le personnel soignant.<br>- Permettre la sélection des chambres et des tâches. | - Interface React responsive (tablette + mobile).<br>- Dashboard de suivi du robot.<br>- Page de sélection des tâches (livraison matériel, repas). | - Maquettage UI/UX (Figma).<br>- Développement des pages principales.<br>- Intégration WebSocket.<br>- Affichage de la carte du robot (optionnel).<br>- Tests utilisateurs (personnel soignant). | - Le personnel peut commander une livraison sans formation technique.<br>- Le robot apparaît en temps réel dans l'interface. | — |
+| **Phase 5 — Livraison (tests unitaires + fonctionnels)** | 08/06/2026 → 28/06/2026 (3 semaines) | - Finaliser la fonctionnalité de livraison.<br>- Tester la fiabilité du système dans un scénario réel. | - Livraison matériel opérationnelle.<br>- Livraison repas opérationnelle.<br>- Rapport de tests. | - Tests unitaires ROS (nodes).<br>- Tests fonctionnels : commande → déplacement → livraison → confirmation.<br>- Gestion des erreurs (collision, batterie faible).<br>- Optimisation de la vitesse et trajectoires. | - 95% des livraisons réussies sans intervention humaine.<br>- Aucun incident de sécurité. | — |
+| **Phase 6 — Commande vocale (optionnelle)** | 29/06/2026 → 13/07/2026 (2,5 semaines) | - Ajouter une fonctionnalité secondaire si le temps le permet. | - Commande vocale opérationnelle. | - Définition du workflow (Demande vocale → Réception → Exécution).<br>- Ajout d’un mode "Vocal" dans l'interface.<br>- Tests de la fonctionnalité avec mots-clés. | - Le robot comprend et exécute la demande vocale.<br>- Le personnel peut déclencher une tâche uniquement avec la voix. | — |
 
 # 12. Questions ouvertes
 
@@ -658,6 +623,4 @@ Contributeurs:<br>
 - Ousmane Sacko
 - Drame Baboye
 - Daniel Komoe
-
-
 
