@@ -457,7 +457,7 @@ Robot retourne vers sa base de charge
 
 # 4. Architecture technique détaillée
 
-## 4.1 Architecture globale
+## 4.1 Diagramme UML 
 
 ![Diagramme d’architecture](Images/Pasted%20image%2020260217150427.png)
 
