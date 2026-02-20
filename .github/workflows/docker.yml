@@ -25,11 +25,11 @@ jobs:
       # 3. Construire les images backend et frontend
       - name: Build Docker images
         run: |
-          docker-compose -f infra/docker-compose.yml build
+          docker compose -f infra/docker-compose.yml build
 
       # 4. Tester si les containers démarrent correctement
       - name: Test Docker containers
         run: |
-          docker-compose -f infra/docker-compose.yml up -d
+          docker compose -f infra/docker-compose.yml up -d
           docker ps
-          docker-compose -f infra/docker-compose.yml down
+          docker compose -f infra/docker-compose.yml down
