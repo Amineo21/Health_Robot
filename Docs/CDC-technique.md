@@ -617,6 +617,16 @@ Robot capable de :
 - communiquer temps réel (suivi du robot)
 
 
+# 14. Pipeline CI/CD & Infrastructure as Code
+
+
+Nous avons implémenté une pipeline CI/CD complète pour assurer des déploiements reproductibles et automatisés. La CI (.github/workflows/docker.yml) se déclenche sur chaque push/PR : elle build les images Docker (frontend React, backend Python, Mosquitto MQTT) et teste leur démarrage via docker-compose up -d. L'infrastructure sous-jacente est gérée par Terraform (infra/terraform/main.tf) qui déclare explicitement le réseau health_robot_network et les volumes persistants mosquitto_data/config, remplaçant les créations implicites de docker-compose.
+
+Choix Terraform justifié: docker-compose suppose Docker installé manuellement et crée des ressources non déclaratives. Terraform garantit une infra 100% reproductible (terraform apply = même état exact) et évolutive vers une VM cloud (même fichier). Le CD (.github/workflows/cd.yml) est prêt pour le déploiement automatique sur main (TODO : SSH vers VM staging + docker compose up -d).
+
+Flux actuel : push branche → CI build/test  | terraform apply → infra réseau/volumes ✅ | merge main → CD deploy VM 🔄. Cette approche garantit zéro intervention manuelle du commit à la prod, alignée sur les standards DevOps industriels.
+
+
 Contributeurs:<br>
 - OUARDI Ahmed-Amine
 - Ehoura Christ-Yvann
