@@ -1,0 +1,176 @@
+# Créé par https://www.toptal.com/developers/gitignore/api/python
+# Modifier sur https://www.toptal.com/developers/gitignore?templates=python
+
+### Python ###
+# Fichiers DLL compilés en octets / optimisés
+__pycache__/
+*.py[code]
+*$py.class
+.DS_Store
+# Extensions C
+*.donc
+
+# Distribution / emballage
+.Python
+construire/
+développer-œufs/
+dist/
+téléchargements/
+œufs/
+.œufs/
+lib/
+lib64/
+parties/
+sdist/
+var/
+roues/
+partager/python-wheels/
+*.egg-info/
+.installed.cfg
+*.œuf
+MANIFESTE
+
+# PyInstaller
+# Ces fichiers sont généralement écrits par un script Python à partir d'un modèle
+# avant que PyInstaller ne construise l'exe, afin d'y injecter la date et d'autres informations.
+*.manifeste
+*.spec
+
+# Journaux d'installation
+pip-log.txt
+pip-supprimer-ce-répertoire.txt
+
+# Rapports de tests unitaires / de couverture
+htmlcov/
+.tox/
+.nox/
+.couverture
+.couverture.*
+.cache
+nosetests.xml
+coverage.xml
+*.couverture
+*.py,cover
+.hypothèse/
+.pytest_cache/
+couverture/
+
+# Traductions
+*.mo
+*.pot
+
+# Éléments Django :
+*.enregistrer
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Matériel pour flasques :
+exemple/
+.webassets-cache
+
+# Trucs de Scrapy :
+.scrapy
+
+# Documentation Sphinx
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+cible/
+
+# Carnet Jupyter
+.ipynb_checkpoints
+
+# IPython
+profil_par_défaut/
+ipython_config.py
+
+# pyenv
+# Pour une bibliothèque ou un package, vous pouvez ignorer ces fichiers car le code est
+# Conçu pour fonctionner dans plusieurs environnements ; sinon, veuillez les enregistrer dans :
+# .python-version
+
+# pipenv
+# Selon pypa/pipenv#598, il est recommandé d'inclure Pipfile.lock dans le contrôle de version.
+Toutefois, en cas de collaboration, si des dépendances ou des dépendances spécifiques à la plateforme existent
+# N'étant pas compatible avec plusieurs plateformes, pipenv peut installer des dépendances qui ne fonctionnent pas, ou pas.
+# Installer toutes les dépendances nécessaires.
+#Pipfile.lock
+
+# poésie
+# À l'instar de Pipfile.lock, il est généralement recommandé d'inclure poetry.lock dans le contrôle de version.
+Ceci est particulièrement recommandé pour les paquets binaires afin de garantir la reproductibilité, et est plus
+# Généralement ignoré pour les bibliothèques.
+# https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
+#poésie.lock
+
+# pdm
+# À l'instar de Pipfile.lock, il est généralement recommandé d'inclure pdm.lock dans le contrôle de version.
+#pdm.lock
+# pdm stocke les configurations globales du projet dans .pdm.toml, mais il est recommandé de ne pas l'inclure.
+# dans le contrôle de version.
+# https://pdm.fming.dev/#use-with-ide
+.pdm.toml
+
+# PEP 582 ; utilisé par exemple par github.com/David-OConnor/pyflow et github.com/pdm-project/pdm
+__pypackages__/
+
+# Trucs au céleri
+calendrier celerybeat
+celerybeat.pid
+
+# Fichiers analysés par SageMath
+*.sage.py
+
+# Environnements
+.env
+.venv
+environnement/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Paramètres du projet Spyder
+.spyderproject
+.projet espion
+
+# Paramètres du projet Rope
+.projet de corde
+
+# Documentation mkdocs
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Vérificateur de type Pyre
+.bûcher/
+
+# analyseur de types statiques pytype
+.pytype/
+
+# Symboles de débogage Cython
+cython_debug/
+
+# PyCharm
+Le modèle spécifique à JetBrains est conservé dans un fichier JetBrains.gitignore distinct qui peut
+# se trouve à l'adresse https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
+# et peut être ajouté au fichier .gitignore global ou fusionné dans ce fichier. Pour une solution plus radicale.
+# Option (non recommandée) : vous pouvez décommenter ce qui suit pour ignorer l’intégralité du dossier « idea ».
+#.idée/
+
+### Correctif Python ###
+# Fichier de configuration locale de Poetry - https://python-poetry.org/docs/configuration/#local-configuration
+poésie.toml
+
+# rugueux
+.ruff_cache/
+
+# Fichiers de configuration LSP
+pyrightconfig.json
+
+# Fin de https://www.toptal.com/developers/gitignore/api/python
