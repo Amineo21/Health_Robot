@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from math import ceil
-from typing import Optional
-
 from app.core.config import settings
 from app.models.events import (
     BatteryEvent,
@@ -21,17 +18,24 @@ from app.mqtt.topics import (
     ROBOT_PUSH_NOTIFICATIONS_TOPIC,
     ROBOT_UI_ALERTS_TOPIC,
 )
+from app.services.navigation_eta_service import NavigationEtaService
 from app.state.robot_state import RobotStateStore
 
 
 class SafetyService:
-    def __init__(self, state_store: RobotStateStore, mqtt_service: MQTTService) -> None:
+    def __init__(
+        self,
+        state_store: RobotStateStore,
+        mqtt_service: MQTTService,
+        navigation_eta_service: NavigationEtaService,
+    ) -> None:
         self._state_store = state_store
         self._mqtt_service = mqtt_service
+        self._navigation_eta_service = navigation_eta_service
 
     def process_battery_telemetry(self, telemetry: BatteryTelemetry) -> BatteryEvent:
         status = self._resolve_battery_status(telemetry)
-        eta_seconds = self._estimate_eta_seconds(telemetry.distance_to_base_m)
+        eta_snapshot = self._navigation_eta_service.build_eta_snapshot(telemetry)
 
         action = "NONE"
         details = None
@@ -45,7 +49,10 @@ class SafetyService:
                     "action": "return_to_base",
                     "reason": "battery_critical",
                     "mission_id": telemetry.mission_id,
-                    "eta_seconds": eta_seconds,
+                    "eta_seconds": eta_snapshot.eta_seconds,
+                    "eta_source": eta_snapshot.eta_source.value,
+                    "path_distance_m": eta_snapshot.path_distance_m,
+                    "distance_remaining_m": eta_snapshot.distance_remaining_m,
                 },
             )
             self._mqtt_service.publish_json(
@@ -72,7 +79,10 @@ class SafetyService:
             status=status,
             severity=Severity.critical if status == BatteryStatus.critical else Severity.info,
             action=action,
-            eta_seconds=eta_seconds,
+            eta_seconds=eta_snapshot.eta_seconds,
+            eta_source=eta_snapshot.eta_source,
+            path_distance_m=eta_snapshot.path_distance_m,
+            distance_remaining_m=eta_snapshot.distance_remaining_m,
             mission_id=telemetry.mission_id,
             details=details,
         )
@@ -137,14 +147,6 @@ class SafetyService:
             retain=True,
         )
         return {"status": "cleared", "restart_procedure": "ADMIN_ONLY", "message": "Reinitialisation effectuee."}
-
-    @staticmethod
-    def _estimate_eta_seconds(distance_to_base_m: Optional[float]) -> Optional[int]:
-        if distance_to_base_m is None:
-            distance_to_base_m = settings.base_eta_distance_m
-        if settings.nominal_return_speed_mps <= 0:
-            return None
-        return ceil(distance_to_base_m / settings.nominal_return_speed_mps)
 
     @staticmethod
     def _resolve_battery_status(telemetry: BatteryTelemetry) -> BatteryStatus:
