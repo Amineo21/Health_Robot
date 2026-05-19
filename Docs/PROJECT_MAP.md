@@ -12,6 +12,22 @@ _Cartographie du système Health Robot EHPAD: blocs, flux, interfaces, responsab
 **Constraints**: Vitesse max 0.5 m/s, capacité < 5kg, arrêt d'urgence iso 3691-4  
 **Tech Stack**: ROS2 (Jetson Nano/Orin NX) + FastAPI (Backend) + React TanStack (Frontend) + MQTT (Communication) + Docker
 
+## Variables d'environnement (Docker)
+
+Le stack Docker lit `infra/.env` (copier depuis `infra/.env.example`, ne pas committer `infra/.env`).
+
+```env
+MQTT_BROKER=
+DB_HOST=
+DB_PORT=
+MYSQL_USER=
+MYSQL_DATABASE=
+MYSQL_PASSWORD=
+MYSQL_ROOT_PASSWORD=
+MQTT_HOST=
+MQTT_PORT=
+```
+
 ---
 
 ## Vue d'ensemble architecturale
