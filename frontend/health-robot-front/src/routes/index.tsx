@@ -1,118 +1,58 @@
-import { createFileRoute } from '@tanstack/react-router'
-import {
-  Zap,
-  Server,
-  Route as RouteIcon,
-  Shield,
-  Waves,
-  Sparkles,
-} from 'lucide-react'
+import { createFileRoute, Link } from '@tanstack/react-router'
 
-export const Route = createFileRoute('/')({ component: App })
+export const Route = createFileRoute('/')({ component: Home })
 
-function App() {
-  const features = [
-    {
-      icon: <Zap className="w-12 h-12 text-cyan-400" />,
-      title: 'Powerful Server Functions',
-      description:
-        'Write server-side code that seamlessly integrates with your client components. Type-safe, secure, and simple.',
-    },
-    {
-      icon: <Server className="w-12 h-12 text-cyan-400" />,
-      title: 'Flexible Server Side Rendering',
-      description:
-        'Full-document SSR, streaming, and progressive enhancement out of the box. Control exactly what renders where.',
-    },
-    {
-      icon: <RouteIcon className="w-12 h-12 text-cyan-400" />,
-      title: 'API Routes',
-      description:
-        'Build type-safe API endpoints alongside your application. No separate backend needed.',
-    },
-    {
-      icon: <Shield className="w-12 h-12 text-cyan-400" />,
-      title: 'Strongly Typed Everything',
-      description:
-        'End-to-end type safety from server to client. Catch errors before they reach production.',
-    },
-    {
-      icon: <Waves className="w-12 h-12 text-cyan-400" />,
-      title: 'Full Streaming Support',
-      description:
-        'Stream data from server to client progressively. Perfect for AI applications and real-time updates.',
-    },
-    {
-      icon: <Sparkles className="w-12 h-12 text-cyan-400" />,
-      title: 'Next Generation Ready',
-      description:
-        'Built from the ground up for modern web applications. Deploy anywhere JavaScript runs.',
-    },
-  ]
-
+function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
-      <section className="relative py-20 px-6 text-center overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-purple-500/10"></div>
-        <div className="relative max-w-5xl mx-auto">
-          <div className="flex items-center justify-center gap-6 mb-6">
-            <img
-              src="/tanstack-circle-logo.png"
-              alt="TanStack Logo"
-              className="w-24 h-24 md:w-32 md:h-32"
-            />
-            <h1 className="text-6xl md:text-7xl font-black text-white [letter-spacing:-0.08em]">
-              <span className="text-gray-300">TANSTACK</span>{' '}
-              <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-                START
-              </span>
-            </h1>
-          </div>
-          <p className="text-2xl md:text-3xl text-gray-300 mb-4 font-light">
-            The framework for next generation AI applications
-          </p>
-          <p className="text-lg text-gray-400 max-w-3xl mx-auto mb-8">
-            Full-stack framework powered by TanStack Router for React and Solid.
-            Build modern applications with server functions, streaming, and type
-            safety.
-          </p>
-          <div className="flex flex-col items-center gap-4">
-            <a
-              href="https://tanstack.com/start"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-8 py-3 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded-lg transition-colors shadow-lg shadow-cyan-500/50"
-            >
-              Documentation
-            </a>
-            <p className="text-gray-400 text-sm mt-2">
-              Begin your TanStack Start journey by editing{' '}
-              <code className="px-2 py-1 bg-slate-700 rounded text-cyan-400">
-                /src/routes/index.tsx
-              </code>
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-16 px-6 max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {features.map((feature, index) => (
-            <div
-              key={index}
-              className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6 hover:border-cyan-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/10"
-            >
-              <div className="mb-4">{feature.icon}</div>
-              <h3 className="text-xl font-semibold text-white mb-3">
-                {feature.title}
-              </h3>
-              <p className="text-gray-400 leading-relaxed">
-                {feature.description}
-              </p>
+    <div className="min-h-[calc(100vh-72px)] bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.18),_transparent_28%),linear-gradient(180deg,_#020617_0%,_#0f172a_48%,_#111827_100%)] px-4 py-10 sm:px-6 lg:px-8">
+      <div className="mx-auto flex min-h-[calc(100vh-112px)] max-w-6xl items-center justify-center">
+        <div className="grid w-full gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <section className="rounded-3xl border border-cyan-400/20 bg-slate-950/50 p-8 text-white shadow-2xl shadow-cyan-950/30 backdrop-blur">
+            <div className="mb-6 inline-flex rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-200">
+              CareBot Control
             </div>
-          ))}
+            <h1 className="max-w-xl text-4xl font-black tracking-tight text-white xl:text-5xl">
+              Une base unique pour piloter le robot et l’équipe.
+            </h1>
+            <p className="mt-5 max-w-lg text-base leading-7 text-slate-300">
+              Le front a été porté sur TanStack Start. Tu peux ouvrir le dashboard, te connecter et
+              retrouver les pages de supervision adaptées à ce projet.
+            </p>
+
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                to="/dashboard"
+                className="rounded-2xl bg-cyan-400 px-5 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300"
+              >
+                Ouvrir le dashboard
+              </Link>
+              <Link
+                to="/auth/login"
+                className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-semibold text-white transition hover:bg-white/10"
+              >
+                Se connecter
+              </Link>
+            </div>
+          </section>
+
+          <aside className="rounded-3xl border border-white/10 bg-white/5 p-8 text-white shadow-lg shadow-black/20 backdrop-blur">
+            <h2 className="text-xl font-semibold">Routes disponibles</h2>
+            <ul className="mt-5 space-y-3 text-sm text-slate-300">
+              <li>/dashboard</li>
+              <li>/auth/login</li>
+              <li>/auth/signup</li>
+              <li>/auth/forgot-password</li>
+              <li>/control</li>
+              <li>/missions</li>
+              <li>/deliveries</li>
+              <li>/map</li>
+              <li>/meals</li>
+              <li>/status</li>
+              <li>/settings</li>
+            </ul>
+          </aside>
         </div>
-      </section>
+      </div>
     </div>
   )
 }

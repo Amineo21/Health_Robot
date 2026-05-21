@@ -3,6 +3,8 @@ import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 
 import Header from '../components/Header'
+import { AuthProvider } from '@/contexts/AuthContext'
+import { RobotProvider } from '@/lib/robot-context'
 
 import appCss from '../styles.css?url'
 
@@ -17,7 +19,7 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'TanStack Start Starter',
+        title: 'Health Robot Front',
       },
     ],
     links: [
@@ -37,8 +39,12 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <Header />
-        {children}
+        <AuthProvider>
+          <RobotProvider>
+            <Header />
+            {children}
+          </RobotProvider>
+        </AuthProvider>
         <TanStackDevtools
           config={{
             position: 'bottom-right',
