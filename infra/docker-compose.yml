@@ -1,35 +1,49 @@
 version: "3.9"
 
 services:
-  mosquitto:
-    image: eclipse-mosquitto:2
-    container_name: mqtt_broker
-    ports:
-      - "1883:1883"
-      - "9001:9001"
-    volumes:
-      - ./mosquitto/config:/mosquitto/config
-      - ./mosquitto/data:/mosquitto/data
-    restart: unless-stopped
+    mosquitto:
+        image: eclipse-mosquitto:2
+        container_name: mqtt_broker
+        ports:
+            - "1883:1883"
+            - "9001:9001"
+        volumes:
+            - ./mosquitto/config:/mosquitto/config
+            - ./mosquitto/data:/mosquitto/data
+        restart: unless-stopped
 
-  backend:
-    build:
-      context: ../backend
-    container_name: robot_backend
-    ports:
-      - "4000:4000"
-    environment:
-      - MQTT_BROKER=mqtt://mosquitto:1883
-    depends_on:
-      - mosquitto
-    restart: unless-stopped
+    backend:
+        build:
+            context: ../backend
+        container_name: robot_backend
+        ports:
+            - "4000:4000"
+        env_file:
+            - path: ./.env
+        depends_on:
+            - mosquitto
+        restart: unless-stopped
 
-  frontend:
-    build:
-      context: ../frontend
-    container_name: robot_frontend
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
-    restart: unless-stopped
+    frontend:
+        build:
+            context: ../frontend
+        container_name: robot_frontend
+        ports:
+            - "3000:3000"
+        depends_on:
+            - backend
+        restart: unless-stopped
+
+    robot_db:
+        image: mysql:8
+        container_name: robot_db
+        ports:
+            - "3306:3306"
+        env_file:
+            - path: ./.env
+        volumes:
+            - robot_db_data:/var/lib/mysql
+        restart: unless-stopped
+
+volumes:
+    robot_db_data:
