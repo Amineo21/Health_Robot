@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -15,18 +16,16 @@ class SqlAlchemyUserRepository:
         self,
         session_factory: Callable[[], Session],
         password_hasher: PasswordHasher,
-        admin_email: str,
-        admin_password: str,
-        caregiver_email: str,
-        caregiver_password: str,
+        initial_admin_email: str,
+        initial_admin_password: str,
+        initial_admin_name: str,
     ) -> None:
         self._session_factory = session_factory
         self._password_hasher = password_hasher
-        self._seed_default_users(
-            admin_email=admin_email,
-            admin_password=admin_password,
-            caregiver_email=caregiver_email,
-            caregiver_password=caregiver_password,
+        self._seed_initial_admin(
+            initial_admin_email=initial_admin_email,
+            initial_admin_password=initial_admin_password,
+            initial_admin_name=initial_admin_name,
         )
 
     def get_by_email(self, email: str) -> User | None:
@@ -39,29 +38,72 @@ class SqlAlchemyUserRepository:
             model = session.get(UserModel, user_id)
             return self._to_domain(model) if model is not None else None
 
-    def _seed_default_users(
+    def list(self) -> list[User]:
+        with self._session_factory() as session:
+            models = session.scalars(select(UserModel).order_by(UserModel.created_at, UserModel.email)).all()
+            return [self._to_domain(model) for model in models]
+
+    def create(self, user: User) -> User:
+        with self._session_factory() as session:
+            model = UserModel(
+                id=user.id,
+                email=user.email.strip().lower(),
+                name=user.name,
+                role=user.role.value,
+                password_hash=user.password_hash,
+                is_active=user.is_active,
+                created_at=user.created_at or self._utc_now(),
+                updated_at=user.updated_at or self._utc_now(),
+            )
+            session.add(model)
+            session.commit()
+            session.refresh(model)
+            return self._to_domain(model)
+
+    def update(self, user: User) -> User:
+        with self._session_factory() as session:
+            model = session.get(UserModel, user.id)
+            if model is None:
+                raise ValueError("Cannot update missing user")
+            model.email = user.email.strip().lower()
+            model.name = user.name
+            model.role = user.role.value
+            model.password_hash = user.password_hash
+            model.is_active = user.is_active
+            model.updated_at = self._utc_now()
+            session.commit()
+            session.refresh(model)
+            return self._to_domain(model)
+
+    def email_exists(self, email: str, exclude_user_id: str | None = None) -> bool:
+        with self._session_factory() as session:
+            query = select(UserModel).where(UserModel.email == email.strip().lower())
+            if exclude_user_id is not None:
+                query = query.where(UserModel.id != exclude_user_id)
+            return session.scalars(query).first() is not None
+
+    def has_role(self, role: UserRole) -> bool:
+        with self._session_factory() as session:
+            return session.scalars(select(UserModel).where(UserModel.role == role.value).limit(1)).first() is not None
+
+    def _seed_initial_admin(
         self,
-        admin_email: str,
-        admin_password: str,
-        caregiver_email: str,
-        caregiver_password: str,
+        initial_admin_email: str,
+        initial_admin_password: str,
+        initial_admin_name: str,
     ) -> None:
         with self._session_factory() as session:
+            admin_exists = session.scalars(select(UserModel).where(UserModel.role == UserRole.admin.value).limit(1)).first()
+            if admin_exists is not None:
+                return
+
             self._ensure_user(
                 session=session,
                 user_id="admin-1",
-                email=admin_email,
-                name="Admin",
+                email=initial_admin_email,
+                name=initial_admin_name,
                 role=UserRole.admin,
-                password=admin_password,
-            )
-            self._ensure_user(
-                session=session,
-                user_id="caregiver-1",
-                email=caregiver_email,
-                name="Caregiver",
-                role=UserRole.caregiver,
-                password=caregiver_password,
+                password=initial_admin_password,
             )
             session.commit()
 
@@ -80,8 +122,10 @@ class SqlAlchemyUserRepository:
             existing.email = normalized_email
             existing.name = name
             existing.role = role.value
+            existing.updated_at = self._utc_now()
             return
 
+        now = self._utc_now()
         session.add(
             UserModel(
                 id=user_id,
@@ -90,6 +134,8 @@ class SqlAlchemyUserRepository:
                 role=role.value,
                 password_hash=self._password_hasher.hash(password),
                 is_active=True,
+                created_at=now,
+                updated_at=now,
             )
         )
 
@@ -102,4 +148,10 @@ class SqlAlchemyUserRepository:
             role=UserRole(model.role),
             password_hash=model.password_hash,
             is_active=model.is_active,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
         )
+
+    @staticmethod
+    def _utc_now() -> datetime:
+        return datetime.now(timezone.utc)

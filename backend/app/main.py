@@ -8,12 +8,17 @@ from fastapi import FastAPI
 from app.application.use_cases.authenticate_user import AuthenticateUserUseCase
 from app.application.use_cases.clear_emergency import ClearEmergencyUseCase
 from app.application.use_cases.container import ApplicationUseCases
+from app.application.use_cases.create_user import CreateUserUseCase
+from app.application.use_cases.deactivate_user import DeactivateUserUseCase
 from app.application.use_cases.get_authenticated_user import GetAuthenticatedUserUseCase
 from app.application.use_cases.get_robot_status import GetRobotStatusUseCase
 from app.application.use_cases.handle_mqtt_message import HandleMqttMessageUseCase
+from app.application.use_cases.list_users import ListUsersUseCase
 from app.application.use_cases.process_battery_telemetry import ProcessBatteryTelemetryUseCase
 from app.application.use_cases.process_navigation_eta import ProcessNavigationEtaUseCase
+from app.application.use_cases.reset_user_password import ResetUserPasswordUseCase
 from app.application.use_cases.trigger_emergency_stop import TriggerEmergencyStopUseCase
+from app.application.use_cases.update_user import UpdateUserUseCase
 from app.core.config import settings
 from app.domain.repositories.user_repository import UserRepository
 from app.infrastructure.database.session import SessionLocal, engine as database_engine
@@ -38,6 +43,10 @@ OPENAPI_TAGS = [
         "description": "Human authentication with JWT for admin and caregiver users.",
     },
     {
+        "name": "admin users",
+        "description": "Admin-only account management for caregivers and other human users.",
+    },
+    {
         "name": "robot",
         "description": "Authenticated human access to the current robot state.",
     },
@@ -56,20 +65,18 @@ def create_user_repository(password_hasher: PasswordHasher) -> UserRepository:
     if settings.user_repository_backend == "memory":
         return InMemoryUserRepository(
             password_hasher=password_hasher,
-            admin_email=settings.admin_email,
-            admin_password=settings.admin_password,
-            caregiver_email=settings.caregiver_email,
-            caregiver_password=settings.caregiver_password,
+            initial_admin_email=settings.initial_admin_email,
+            initial_admin_password=settings.initial_admin_password,
+            initial_admin_name=settings.initial_admin_name,
         )
 
     if settings.user_repository_backend == "database":
         return SqlAlchemyUserRepository(
             session_factory=SessionLocal,
             password_hasher=password_hasher,
-            admin_email=settings.admin_email,
-            admin_password=settings.admin_password,
-            caregiver_email=settings.caregiver_email,
-            caregiver_password=settings.caregiver_password,
+            initial_admin_email=settings.initial_admin_email,
+            initial_admin_password=settings.initial_admin_password,
+            initial_admin_name=settings.initial_admin_name,
         )
 
     raise ValueError("USER_REPOSITORY_BACKEND must be 'memory' or 'database'")
@@ -119,6 +126,11 @@ def create_app() -> FastAPI:
             expires_in_seconds=token_expires_in_seconds,
         ),
         get_authenticated_user=GetAuthenticatedUserUseCase(user_repository),
+        create_user=CreateUserUseCase(user_repository=user_repository, password_hasher=password_hasher),
+        list_users=ListUsersUseCase(user_repository),
+        update_user=UpdateUserUseCase(user_repository),
+        deactivate_user=DeactivateUserUseCase(user_repository),
+        reset_user_password=ResetUserPasswordUseCase(user_repository=user_repository, password_hasher=password_hasher),
     )
     handle_mqtt_message = HandleMqttMessageUseCase(
         process_battery_telemetry=process_battery_telemetry,
