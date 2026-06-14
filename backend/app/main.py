@@ -5,24 +5,63 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.application.use_cases.authenticate_user import AuthenticateUserUseCase
 from app.application.use_cases.clear_emergency import ClearEmergencyUseCase
 from app.application.use_cases.container import ApplicationUseCases
+from app.application.use_cases.get_authenticated_user import GetAuthenticatedUserUseCase
 from app.application.use_cases.get_robot_status import GetRobotStatusUseCase
 from app.application.use_cases.handle_mqtt_message import HandleMqttMessageUseCase
 from app.application.use_cases.process_battery_telemetry import ProcessBatteryTelemetryUseCase
 from app.application.use_cases.process_navigation_eta import ProcessNavigationEtaUseCase
 from app.application.use_cases.trigger_emergency_stop import TriggerEmergencyStopUseCase
 from app.core.config import settings
+from app.domain.repositories.user_repository import UserRepository
+from app.infrastructure.database.session import SessionLocal, engine as database_engine
 from app.infrastructure.mqtt.client import MQTTService
+from app.infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
 from app.infrastructure.repositories.in_memory_robot_state_repository import InMemoryRobotStateRepository
+from app.infrastructure.repositories.sqlalchemy_user_repository import SqlAlchemyUserRepository
+from app.infrastructure.security.jwt_token_service import JwtTokenService
+from app.infrastructure.security.password_hasher import PasswordHasher
 from app.presentation.api.health import router as health_router
 from app.presentation.api.v1.router import api_router
 
 logging.basicConfig(level=logging.INFO)
 
 
+def create_user_repository(password_hasher: PasswordHasher) -> UserRepository:
+    if settings.user_repository_backend == "memory":
+        return InMemoryUserRepository(
+            password_hasher=password_hasher,
+            admin_email=settings.admin_email,
+            admin_password=settings.admin_password,
+            caregiver_email=settings.caregiver_email,
+            caregiver_password=settings.caregiver_password,
+        )
+
+    if settings.user_repository_backend == "database":
+        return SqlAlchemyUserRepository(
+            session_factory=SessionLocal,
+            password_hasher=password_hasher,
+            admin_email=settings.admin_email,
+            admin_password=settings.admin_password,
+            caregiver_email=settings.caregiver_email,
+            caregiver_password=settings.caregiver_password,
+        )
+
+    raise ValueError("USER_REPOSITORY_BACKEND must be 'memory' or 'database'")
+
+
 def create_app() -> FastAPI:
     robot_state_repository = InMemoryRobotStateRepository()
+    password_hasher = PasswordHasher()
+    token_expires_in_seconds = settings.access_token_expire_minutes * 60
+    token_service = JwtTokenService(
+        secret_key=settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
+        expires_in_seconds=token_expires_in_seconds,
+    )
+    user_repository = create_user_repository(password_hasher)
     mqtt_service = MQTTService(settings=settings)
     process_navigation_eta = ProcessNavigationEtaUseCase(
         state_repository=robot_state_repository,
@@ -50,6 +89,13 @@ def create_app() -> FastAPI:
         process_navigation_eta=process_navigation_eta,
         trigger_emergency_stop=trigger_emergency_stop,
         clear_emergency=clear_emergency,
+        authenticate_user=AuthenticateUserUseCase(
+            user_repository=user_repository,
+            password_hasher=password_hasher,
+            token_service=token_service,
+            expires_in_seconds=token_expires_in_seconds,
+        ),
+        get_authenticated_user=GetAuthenticatedUserUseCase(user_repository),
     )
     handle_mqtt_message = HandleMqttMessageUseCase(
         process_battery_telemetry=process_battery_telemetry,
@@ -61,7 +107,9 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         app.state.robot_state_repository = robot_state_repository
+        app.state.database_engine = database_engine
         app.state.mqtt_service = mqtt_service
+        app.state.token_service = token_service
         app.state.use_cases = use_cases
         mqtt_service.start()
         try:

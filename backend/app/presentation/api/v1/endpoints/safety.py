@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from app.application.dto.robot_dto import BatteryEvent, BatteryTelemetry, EmergencyEvent, EmergencyStopRequest
-from app.presentation.api.dependencies import UseCasesDep
+from app.presentation.api.dependencies import AdminUserDep, CaregiverOrAdminDep, UseCasesDep
 
 router = APIRouter(prefix="/safety", tags=["securite"])
 
@@ -15,6 +15,8 @@ def ingest_battery_telemetry(
     use_cases: UseCasesDep,
     telemetry: BatteryTelemetry,
 ) -> BatteryEvent:
+    # Public in development: robot-only telemetry endpoint.
+    # Future protection: require_robot_api_key.
     event = use_cases.process_battery_telemetry.execute(telemetry.to_domain())
     return BatteryEvent.from_domain(event)
 
@@ -22,6 +24,7 @@ def ingest_battery_telemetry(
 @router.post("/emergency", response_model=EmergencyEvent)
 def trigger_emergency_stop(
     use_cases: UseCasesDep,
+    _current_user: CaregiverOrAdminDep,
     payload: EmergencyStopRequest,
 ) -> EmergencyEvent:
     event = use_cases.trigger_emergency_stop.execute(payload.to_domain())
@@ -31,6 +34,7 @@ def trigger_emergency_stop(
 @router.post("/emergency/reset")
 def clear_emergency(
     use_cases: UseCasesDep,
+    _current_user: AdminUserDep,
     actor: Annotated[str, Query()] = "admin",
 ) -> dict[str, str]:
     return use_cases.clear_emergency.execute(actor)
