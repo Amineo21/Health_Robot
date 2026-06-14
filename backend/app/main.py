@@ -28,6 +28,29 @@ from app.presentation.api.v1.router import api_router
 
 logging.basicConfig(level=logging.INFO)
 
+OPENAPI_TAGS = [
+    {
+        "name": "health",
+        "description": "Service availability and basic backend status checks.",
+    },
+    {
+        "name": "auth",
+        "description": "Human authentication with JWT for admin and caregiver users.",
+    },
+    {
+        "name": "robot",
+        "description": "Authenticated human access to the current robot state.",
+    },
+    {
+        "name": "navigation",
+        "description": "Navigation ETA telemetry and authenticated ETA/status reads.",
+    },
+    {
+        "name": "securite",
+        "description": "Battery safety, emergency stop, and admin-only emergency reset.",
+    },
+]
+
 
 def create_user_repository(password_hasher: PasswordHasher) -> UserRepository:
     if settings.user_repository_backend == "memory":
@@ -119,7 +142,12 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title="Backend Health Robot",
+        description=(
+            "Backend API for the Health Robot system. Human users authenticate with JWT. "
+            "Robot-only telemetry ingestion endpoints remain public in development for the MVP."
+        ),
         version="0.1.0",
+        openapi_tags=OPENAPI_TAGS,
         lifespan=lifespan,
     )
     app.include_router(health_router)

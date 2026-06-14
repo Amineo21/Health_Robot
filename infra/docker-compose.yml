@@ -67,3 +67,5 @@ services:
 
 volumes:
   mysql_data:
+    name: health_robot_mysql_data
+    driver: local
