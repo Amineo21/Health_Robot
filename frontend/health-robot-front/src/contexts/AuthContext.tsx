@@ -1,93 +1,126 @@
-'use client'
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 
-import { createContext, useContext, useEffect, useState } from 'react'
-
-import {
-  clearAuthStorage,
-  createUser,
-  getCurrentUser,
-  getStoredUsers,
-  saveStoredUsers,
-  seedDefaultUserIfNeeded,
-  setCurrentUser,
-  type User,
-  type UserRole,
-} from '@/lib/auth'
+interface User {
+  id: string
+  email: string
+  name: string
+}
 
 interface AuthContextType {
   user: User | null
-  isLoading: boolean
   isAuthenticated: boolean
+  isLoading: boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
-  signup: (email: string, password: string, name: string, role: UserRole) => Promise<void>
-  resetPassword: (email: string) => Promise<void>
+  signup: (email: string, password: string, name: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    seedDefaultUserIfNeeded()
-    setUser(getCurrentUser())
-    setIsLoading(false)
+    // Check if user is already authenticated on mount
+    const checkAuth = async () => {
+      try {
+        // TODO: Call your backend to verify token/session
+        const token = localStorage.getItem('auth_token')
+        if (token) {
+          // Fetch user data from backend
+          // const response = await fetch('/api/auth/me', {
+          //   headers: { Authorization: `Bearer ${token}` }
+          // })
+          // if (response.ok) {
+          //   const userData = await response.json()
+          //   setUser(userData)
+          // }
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    checkAuth()
   }, [])
 
   const login = async (email: string, password: string) => {
-    const users = seedDefaultUserIfNeeded()
-    const existingUser = users.find(
-      (entry) => entry.user.email.toLowerCase() === email.toLowerCase() && entry.password === password,
-    )
+    setIsLoading(true)
+    try {
+      // TODO: Implement actual login API call
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
 
-    if (existingUser) {
-      setCurrentUser(existingUser.user)
-      setUser(existingUser.user)
-      return
+      if (!response.ok) {
+        throw new Error('Login failed')
+      }
+
+      const data = await response.json()
+      localStorage.setItem('auth_token', data.token)
+      setUser(data.user)
+    } catch (error) {
+      console.error('Login error:', error)
+      throw error
+    } finally {
+      setIsLoading(false)
     }
-
-    const fallbackUser = createUser(email, email.split('@')[0] || 'Utilisateur', 'infirmier')
-    const nextUsers = [...users, { user: fallbackUser, password }]
-    saveStoredUsers(nextUsers)
-    setCurrentUser(fallbackUser)
-    setUser(fallbackUser)
   }
 
   const logout = async () => {
-    clearAuthStorage()
-    setUser(null)
-  }
-
-  const signup = async (email: string, password: string, name: string, role: UserRole) => {
-    const users = seedDefaultUserIfNeeded()
-    const duplicate = users.some((entry) => entry.user.email.toLowerCase() === email.toLowerCase())
-
-    if (duplicate) {
-      throw new Error('Un compte existe déjà avec cet email')
+    setIsLoading(true)
+    try {
+      // TODO: Implement actual logout API call
+      localStorage.removeItem('auth_token')
+      setUser(null)
+    } catch (error) {
+      console.error('Logout error:', error)
+      throw error
+    } finally {
+      setIsLoading(false)
     }
-
-    const nextUser = createUser(email, name, role)
-    const nextUsers = [...users, { user: nextUser, password }]
-
-    saveStoredUsers(nextUsers)
-    setCurrentUser(nextUser)
-    setUser(nextUser)
   }
 
-  const resetPassword = async (email: string) => {
-    const users = getStoredUsers()
-    const userExists = users.some((entry) => entry.user.email.toLowerCase() === email.toLowerCase())
+  const signup = async (email: string, password: string, name: string) => {
+    setIsLoading(true)
+    try {
+      // TODO: Implement actual signup API call
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, name }),
+      })
 
-    if (!userExists) {
-      throw new Error('Aucun compte trouvé pour cet email')
+      if (!response.ok) {
+        throw new Error('Signup failed')
+      }
+
+      const data = await response.json()
+      localStorage.setItem('auth_token', data.token)
+      setUser(data.user)
+    } catch (error) {
+      console.error('Signup error:', error)
+      throw error
+    } finally {
+      setIsLoading(false)
     }
   }
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, isAuthenticated: !!user, login, logout, signup, resetPassword }}
+      value={{
+        user,
+        isAuthenticated: !!user,
+        isLoading,
+        login,
+        logout,
+        signup,
+      }}
     >
       {children}
     </AuthContext.Provider>
@@ -96,10 +129,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext)
-
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider')
   }
-
   return context
 }

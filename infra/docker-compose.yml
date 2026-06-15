@@ -1,49 +1,70 @@
 services:
-    mosquitto:
-        image: eclipse-mosquitto:2
-        container_name: mqtt_broker
-        ports:
-            - "1883:1883"
-            - "9001:9001"
-        volumes:
-            - ./mosquitto/config:/mosquitto/config
-            - ./mosquitto/data:/mosquitto/data
-        restart: unless-stopped
+  mysql:
+    image: mysql:8.4
+    container_name: robot_mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-health_robot}
+      MYSQL_USER: ${MYSQL_USER:-health_robot}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-health_robot}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-health_robot_root}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
-    backend:
-        build:
-            context: ../backend
-        container_name: robot_backend
-        ports:
-            - "4000:4000"
-        env_file:
-            - ./.env
-        volumes:
-            - ./map:/app/map
-        depends_on:
-            - mosquitto
-        restart: unless-stopped
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mqtt_broker
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+    restart: unless-stopped
 
-    frontend:
-        build:
-            context: ../frontend
-        container_name: robot_frontend
-        ports:
-            - "3000:3000"
-        depends_on:
-            - backend
-        restart: unless-stopped
+  backend:
+    build:
+      context: ../backend
+    container_name: robot_backend
+    ports:
+      - "4000:4000"
+    environment:
+      - MQTT_BROKER=mqtt://mosquitto:1883
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - DATABASE_URL=mysql+pymysql://${MYSQL_USER:-health_robot}:${MYSQL_PASSWORD:-health_robot}@mysql:3306/${MYSQL_DATABASE:-health_robot}?charset=utf8mb4
+      - USER_REPOSITORY_BACKEND=database
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-secret-change-me}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
+      - INITIAL_ADMIN_EMAIL=${INITIAL_ADMIN_EMAIL:-admin@health-robot.local}
+      - INITIAL_ADMIN_PASSWORD=${INITIAL_ADMIN_PASSWORD:-admin}
+      - INITIAL_ADMIN_NAME=${INITIAL_ADMIN_NAME:-Admin}
+    depends_on:
+      mosquitto:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
 
-    robot_db:
-        image: mysql:8
-        container_name: robot_db
-        ports:
-            - "3306:3306"
-        env_file:
-            - ./.env
-        volumes:
-            - robot_db_data:/var/lib/mysql
-        restart: unless-stopped
+  frontend:
+    build:
+      context: ../frontend
+    container_name: robot_frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
 
 volumes:
-    robot_db_data:
+  mysql_data:
+    name: health_robot_mysql_data
+    driver: local

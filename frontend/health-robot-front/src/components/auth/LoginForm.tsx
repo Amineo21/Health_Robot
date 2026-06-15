@@ -1,79 +1,82 @@
-'use client'
-
 import { useState } from 'react'
-
 import { useNavigate } from '@tanstack/react-router'
-
 import { useAuth } from '@/contexts/AuthContext'
 
 export function LoginForm() {
-  const navigate = useNavigate()
-  const { login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+  const navigate = useNavigate()
+  const { login } = useAuth()
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setError(null)
-    setIsSubmitting(true)
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setIsLoading(true)
 
     try {
       await login(email, password)
-      await navigate({ to: '/dashboard', replace: true })
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Échec de connexion')
+      navigate({ to: '/dashboard' })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur de connexion')
     } finally {
-      setIsSubmitting(false)
+      setIsLoading(false)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="space-y-2">
-        <label htmlFor="email" className="text-sm font-medium text-slate-200">
-          Adresse email
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-2">
+          Email
         </label>
         <input
           id="email"
           type="email"
           value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder="vous@ehpad.fr"
-          className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+          onChange={(e) => setEmail(e.target.value)}
           required
+          className="w-full px-4 py-2 bg-white/10 border border-cyan-400/30 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400/60 transition-colors"
+          placeholder="exemple@email.com"
         />
       </div>
 
-      <div className="space-y-2">
-        <label htmlFor="password" className="text-sm font-medium text-slate-200">
+      <div>
+        <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-2">
           Mot de passe
         </label>
         <input
           id="password"
           type="password"
           value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          placeholder="••••••••"
-          className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+          onChange={(e) => setPassword(e.target.value)}
           required
+          className="w-full px-4 py-2 bg-white/10 border border-cyan-400/30 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400/60 transition-colors"
+          placeholder="••••••••"
         />
       </div>
 
-      {error ? (
-        <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+      {error && (
+        <div className="p-3 bg-red-500/20 border border-red-400/50 rounded-lg text-red-300 text-sm">
           {error}
         </div>
-      ) : null}
+      )}
 
       <button
         type="submit"
-        disabled={isSubmitting}
-        className="flex w-full items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={isLoading}
+        className="w-full px-4 py-2 bg-gradient-to-r from-cyan-400 to-cyan-300 text-slate-950 font-bold rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {isSubmitting ? 'Connexion...' : 'Se connecter'}
+        {isLoading ? 'Connexion...' : 'Se connecter'}
       </button>
+
+      <div className="pt-4 border-t border-white/10 text-center text-sm text-slate-400">
+        Pas encore de compte ? {' '}
+        <a href="/auth/signup" className="text-cyan-400 hover:text-cyan-300 transition-colors">
+          S'inscrire
+        </a>
+      </div>
     </form>
   )
 }

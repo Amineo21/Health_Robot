@@ -16,14 +16,6 @@ def generate_launch_description():
         description='Chemin vers la carte SLAM sauvegardée'
     )
 
-    # Bridge MQTT ↔ ROS2
-    mqtt_bridge_node = Node(
-        package='mqtt_bridge',
-        executable='mqtt_bridge_node',
-        name='mqtt_bridge_node',
-        output='screen',
-    )
-
     # Node de navigation (notre code)
     navigation_node = Node(
         package='navigation',
@@ -64,7 +56,6 @@ def generate_launch_description():
 
     return LaunchDescription([
         map_file,
-        mqtt_bridge_node,
         navigation_node,
         obstacle_avoidance_node,
         vision_node,
