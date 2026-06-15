@@ -1,96 +1,87 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
-from pathlib import Path
-
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 
-from app.models.events import BatteryTelemetry, EmergencyStopRequest, NavigationEtaTelemetry
-from app.mqtt.client import MQTTService
-from app.mqtt.topics import (
-    ROBOT_BATTERY_TOPIC,
-    ROBOT_EMERGENCY_TOPIC,
-    ROBOT_NAV2_FEEDBACK_TOPIC,
-    ROBOT_NAV2_PATH_TOPIC,
-    ROBOT_NAV_PATH_DISPLAY_TOPIC,
-    ROBOT_STATUS_TOPIC,
-)
-from app.routes.navigation import router as navigation_router
-from app.routes.robot import router as robot_router
-from app.routes.safety import router as safety_router
-from app.services.navigation_eta_service import NavigationEtaService
-from app.services.safety_service import SafetyService
-from app.state.robot_state import RobotStateStore
+from app.application.dto.robot_dto import RobotStatus as RobotStatusDto
+from app.application.use_cases.clear_emergency import ClearEmergencyUseCase
+from app.application.use_cases.container import ApplicationUseCases
+from app.application.use_cases.get_robot_status import GetRobotStatusUseCase
+from app.application.use_cases.handle_mqtt_message import HandleMqttMessageUseCase
+from app.application.use_cases.process_battery_telemetry import ProcessBatteryTelemetryUseCase
+from app.application.use_cases.process_navigation_eta import ProcessNavigationEtaUseCase
+from app.application.use_cases.trigger_emergency_stop import TriggerEmergencyStopUseCase
+from app.core.config import settings
+from app.domain.entities.mqtt_topics import ROBOT_NAV_PATH_DISPLAY_TOPIC, ROBOT_POSE_TOPIC
+from app.infrastructure.mqtt.client import MQTTService
+from app.infrastructure.repositories.in_memory_robot_state_repository import InMemoryRobotStateRepository
+from app.presentation.api.health import router as health_router
+from app.presentation.api.v1.router import api_router
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
-    robot_state = RobotStateStore()
-    navigation_eta_service = NavigationEtaService(state_store=robot_state)
+    robot_state_repository = InMemoryRobotStateRepository()
+    mqtt_service = MQTTService(settings=settings)
+
+    process_navigation_eta = ProcessNavigationEtaUseCase(
+        state_repository=robot_state_repository,
+        base_eta_distance_m=settings.base_eta_distance_m,
+        nominal_return_speed_mps=settings.nominal_return_speed_mps,
+    )
+    process_battery_telemetry = ProcessBatteryTelemetryUseCase(
+        state_repository=robot_state_repository,
+        message_publisher=mqtt_service,
+        navigation_eta_use_case=process_navigation_eta,
+        low_battery_threshold=settings.low_battery_threshold,
+        auto_return_enabled=settings.auto_return_enabled,
+    )
+    trigger_emergency_stop = TriggerEmergencyStopUseCase(
+        state_repository=robot_state_repository,
+        message_publisher=mqtt_service,
+    )
+    clear_emergency = ClearEmergencyUseCase(
+        state_repository=robot_state_repository,
+        message_publisher=mqtt_service,
+    )
+    use_cases = ApplicationUseCases(
+        get_robot_status=GetRobotStatusUseCase(robot_state_repository),
+        process_battery_telemetry=process_battery_telemetry,
+        process_navigation_eta=process_navigation_eta,
+        trigger_emergency_stop=trigger_emergency_stop,
+        clear_emergency=clear_emergency,
+    )
+    handle_mqtt_message = HandleMqttMessageUseCase(
+        process_battery_telemetry=process_battery_telemetry,
+        process_navigation_eta=process_navigation_eta,
+        trigger_emergency_stop=trigger_emergency_stop,
+    )
+
+    # Etat temps reel pour l'affichage de la carte cote frontend.
     robot_pose: dict[str, float] = {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0}
     nav_path: list[dict[str, float]] = []
 
-    def handle_mqtt_message(topic: str, payload: dict[str, Any]) -> None:
-        if topic == ROBOT_BATTERY_TOPIC:
-            try:
-                telemetry = BatteryTelemetry.model_validate(payload)
-            except Exception as exc:  
-                logger.warning("Payload batterie invalide recu: %s", exc)
-                return
-            app.state.safety_service.process_battery_telemetry(telemetry)
-            return
-
-        if topic in {ROBOT_NAV2_PATH_TOPIC, ROBOT_NAV2_FEEDBACK_TOPIC}:
-            try:
-                default_source = "NAV2_PATH" if topic == ROBOT_NAV2_PATH_TOPIC else "NAV2_FEEDBACK"
-                telemetry = NavigationEtaTelemetry.model_validate(
-                    {
-                        **payload,
-                        "eta_source": payload.get("eta_source", default_source),
-                    }
-                )
-            except Exception as exc:
-                logger.warning("Payload navigation ETA invalide recu: %s", exc)
-                return
-            app.state.navigation_eta_service.process_nav2_telemetry(telemetry)
-            return
-
-        if topic == "robot/pose":
+    def on_mqtt_message(topic: str, payload: dict[str, Any]) -> None:
+        if topic == ROBOT_POSE_TOPIC:
             robot_pose.update(payload)
             return
-
         if topic == ROBOT_NAV_PATH_DISPLAY_TOPIC:
             nonlocal nav_path
             nav_path = payload.get("poses", [])
             return
+        handle_mqtt_message.execute(topic, payload)
 
-        if topic == ROBOT_EMERGENCY_TOPIC and payload.get("active"):
-            try:
-                emergency_request = EmergencyStopRequest(
-                    source=payload.get("source", "ros2"),
-                    reason=payload.get("reason", "Arret d'urgence declenche cote robot."),
-                    requires_admin_restart=payload.get("requires_admin_restart", True),
-                )
-            except Exception as exc:  
-                logger.warning("Payload d'urgence invalide recu: %s", exc)
-                return
-            app.state.safety_service.trigger_emergency_stop(emergency_request)
-
-    mqtt_service = MQTTService(on_message=handle_mqtt_message)
-    safety_service = SafetyService(
-        state_store=robot_state,
-        mqtt_service=mqtt_service,
-        navigation_eta_service=navigation_eta_service,
-    )
+    mqtt_service.set_message_handler(on_mqtt_message)
 
     ws_clients: list[WebSocket] = []
 
@@ -99,7 +90,8 @@ def create_app() -> FastAPI:
             await asyncio.sleep(2)
             if not ws_clients:
                 continue
-            status = robot_state.get_status().model_dump(mode="json")
+            domain_status = use_cases.get_robot_status.execute()
+            status = RobotStatusDto.from_domain(domain_status).model_dump(mode="json")
             status["pose"] = dict(robot_pose)
             status["nav_path"] = list(nav_path)
             dead = []
@@ -113,11 +105,9 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
-        app.state.robot_state = robot_state
+        app.state.robot_state_repository = robot_state_repository
         app.state.mqtt_service = mqtt_service
-        app.state.navigation_eta_service = navigation_eta_service
-        app.state.safety_service = safety_service
-        app.state.ws_clients = ws_clients
+        app.state.use_cases = use_cases
         mqtt_service.start()
         task = asyncio.create_task(broadcast_status())
         try:
@@ -137,24 +127,13 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    app.include_router(navigation_router)
-    app.include_router(robot_router)
-    app.include_router(safety_router)
-
-    @app.get("/")
-    async def read_root() -> dict[str, str]:
-        return {"status": "ok", "message": "API backend du robot operationnelle"}
-
-    @app.get("/health")
-    async def healthcheck() -> dict[str, str]:
-        return {"status": "healthy", "message": "Service en bonne sante"}
+    app.include_router(health_router)
+    app.include_router(api_router)
 
     @app.get("/api/map/image")
     async def get_map_image():
-        from fastapi import HTTPException
-        from fastapi.responses import Response
         from PIL import Image as PilImage
-        import io
+
         map_path = Path("/app/map/yahboom_map.pgm")
         if not map_path.exists():
             raise HTTPException(status_code=404, detail="Carte non disponible")
@@ -166,6 +145,7 @@ def create_app() -> FastAPI:
     @app.get("/api/map/metadata")
     async def get_map_metadata() -> dict:
         import yaml
+
         yaml_path = Path("/app/map/yahboom_map.yaml")
         if not yaml_path.exists():
             return {"resolution": 0.05, "origin": [0.0, 0.0, 0.0], "width": 0, "height": 0}

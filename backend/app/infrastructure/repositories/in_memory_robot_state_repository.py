@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from copy import deepcopy
+from dataclasses import replace
 from threading import Lock
-from typing import Optional
 
-from app.models.events import (
+from app.domain.entities.robot import (
     BatteryEvent,
     BatteryStatus,
     EmergencyEvent,
@@ -13,14 +14,14 @@ from app.models.events import (
 )
 
 
-class RobotStateStore:
+class InMemoryRobotStateRepository:
     def __init__(self) -> None:
         self._lock = Lock()
         self._status = RobotStatus()
 
     def get_status(self) -> RobotStatus:
         with self._lock:
-            return self._status.model_copy(deep=True)
+            return deepcopy(self._status)
 
     def update_battery(self, event: BatteryEvent) -> RobotStatus:
         with self._lock:
@@ -32,33 +33,27 @@ class RobotStateStore:
             elif self._status.mode == RobotMode.returning_to_base and event.status == BatteryStatus.normal:
                 mode = RobotMode.idle
 
-            self._status = self._status.model_copy(
-                update={
-                    "battery_level": event.battery_level,
-                    "battery_status": event.status,
-                    "eta_to_base_seconds": event.eta_seconds,
-                    "eta_source": event.eta_source,
-                    "path_distance_m": event.path_distance_m,
-                    "distance_remaining_m": event.distance_remaining_m,
-                    "last_battery_event": event,
-                    "mode": mode,
-                }
+            self._status = replace(
+                self._status,
+                battery_level=event.battery_level,
+                battery_status=event.status,
+                eta_to_base_seconds=event.eta_seconds,
+                eta_source=event.eta_source,
+                path_distance_m=event.path_distance_m,
+                distance_remaining_m=event.distance_remaining_m,
+                last_battery_event=event,
+                mode=mode,
             )
-            return self._status.model_copy(deep=True)
+            return deepcopy(self._status)
 
-    def set_mode(self, mode: RobotMode, mission_id: Optional[str] = None) -> RobotStatus:
+    def set_mode(self, mode: RobotMode, mission_id: str | None = None) -> RobotStatus:
         with self._lock:
-            self._status = self._status.model_copy(
-                update={
-                    "mode": mode,
-                    "mission_id": mission_id,
-                }
-            )
-            return self._status.model_copy(deep=True)
+            self._status = replace(self._status, mode=mode, mission_id=mission_id)
+            return deepcopy(self._status)
 
     def update_navigation_eta(self, telemetry: NavigationEtaTelemetry) -> RobotStatus:
         with self._lock:
-            update: dict[str, object] = {
+            update = {
                 "eta_to_base_seconds": telemetry.eta_seconds,
                 "eta_source": telemetry.eta_source,
                 "path_distance_m": telemetry.path_distance_m,
@@ -67,10 +62,11 @@ class RobotStateStore:
             }
             if telemetry.mission_id is not None:
                 update["mission_id"] = telemetry.mission_id
-            self._status = self._status.model_copy(update=update)
-            return self._status.model_copy(deep=True)
 
-    def get_navigation_eta(self, mission_id: Optional[str] = None) -> Optional[NavigationEtaTelemetry]:
+            self._status = replace(self._status, **update)
+            return deepcopy(self._status)
+
+    def get_navigation_eta(self, mission_id: str | None = None) -> NavigationEtaTelemetry | None:
         with self._lock:
             if mission_id is not None and self._status.mission_id not in {None, mission_id}:
                 return None
@@ -96,21 +92,19 @@ class RobotStateStore:
 
     def trigger_emergency(self, event: EmergencyEvent) -> RobotStatus:
         with self._lock:
-            self._status = self._status.model_copy(
-                update={
-                    "emergency_active": True,
-                    "mode": RobotMode.emergency_stop,
-                    "last_emergency_event": event,
-                }
+            self._status = replace(
+                self._status,
+                emergency_active=True,
+                mode=RobotMode.emergency_stop,
+                last_emergency_event=event,
             )
-            return self._status.model_copy(deep=True)
+            return deepcopy(self._status)
 
     def clear_emergency(self) -> RobotStatus:
         with self._lock:
-            self._status = self._status.model_copy(
-                update={
-                    "emergency_active": False,
-                    "mode": RobotMode.idle,
-                }
+            self._status = replace(
+                self._status,
+                emergency_active=False,
+                mode=RobotMode.idle,
             )
-            return self._status.model_copy(deep=True)
+            return deepcopy(self._status)

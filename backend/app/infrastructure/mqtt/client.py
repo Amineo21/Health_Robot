@@ -2,21 +2,21 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 import paho.mqtt.client as mqtt
 
-from app.core.config import settings
-from app.mqtt.topics import SUBSCRIPTION_TOPICS
+from app.core.config import Settings
+from app.domain.entities.mqtt_topics import SUBSCRIPTION_TOPICS
 
 logger = logging.getLogger(__name__)
-
 
 MessageHandler = Callable[[str, dict[str, Any]], None]
 
 
 class MQTTService:
-    def __init__(self, on_message: Optional[MessageHandler] = None) -> None:
+    def __init__(self, settings: Settings, on_message: MessageHandler | None = None) -> None:
+        self._settings = settings
         self._on_message = on_message
         self._client = mqtt.Client(client_id=settings.mqtt_client_id, protocol=mqtt.MQTTv311)
         if settings.mqtt_username:
@@ -26,11 +26,18 @@ class MQTTService:
         self._client.on_message = self._handle_message
         self._client.on_disconnect = self._handle_disconnect
 
+    def set_message_handler(self, on_message: MessageHandler) -> None:
+        self._on_message = on_message
+
     def start(self) -> None:
         try:
-            self._client.connect(settings.mqtt_host, settings.mqtt_port, settings.mqtt_keepalive)
+            self._client.connect(
+                self._settings.mqtt_host,
+                self._settings.mqtt_port,
+                self._settings.mqtt_keepalive,
+            )
             self._client.loop_start()
-            logger.info("MQTT connecte sur %s:%s", settings.mqtt_host, settings.mqtt_port)
+            logger.info("MQTT connecte sur %s:%s", self._settings.mqtt_host, self._settings.mqtt_port)
         except OSError as exc:
             logger.warning("MQTT indisponible au demarrage: %s", exc)
 
