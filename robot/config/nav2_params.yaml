@@ -1,0 +1,82 @@
+amcl:
+  ros__parameters:
+    # Localisation du robot sur la carte sauvegardée
+    max_beams: 60
+    max_particles: 2000
+    min_particles: 500
+    robot_model_type: "nav2_amcl::DifferentialMotionModel"
+    scan_topic: /scan
+
+bt_navigator:
+  ros__parameters:
+    global_frame: map
+    robot_base_frame: base_link
+    odom_topic: /odom
+    # Temps max pour atteindre un goal (3 minutes selon CDC)
+    goal_reached_tol: 0.25
+
+controller_server:
+  ros__parameters:
+    controller_frequency: 20.0
+    FollowPath:
+      plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+      # Vitesse max 0.5 m/s (0.3 m/s avec repas — géré par le delivery_node)
+      desired_linear_vel: 0.5
+      max_linear_accel: 1.0
+      max_linear_decel: 1.0
+      use_velocity_scaled_lookahead_dist: true
+
+planner_server:
+  ros__parameters:
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_navfn_planner::NavfnPlanner"
+      tolerance: 0.5
+      use_astar: true
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 10.0
+      publish_frequency: 5.0
+      global_frame: odom
+      robot_base_frame: base_link
+      width: 3
+      height: 3
+      resolution: 0.05
+      # Distance de sécurité autour du robot (0.5m selon CDC)
+      robot_radius: 0.3
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        inflation_radius: 0.55
+        cost_scaling_factor: 3.5
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: true
+          marking: true
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: base_link
+      resolution: 0.05
+      robot_radius: 0.3
+      track_unknown_space: true
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: true
+          marking: true
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        inflation_radius: 0.55
