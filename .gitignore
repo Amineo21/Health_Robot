@@ -124,12 +124,20 @@ celerybeat.pid
 
 # Environnements
 .env
+.env.*
 .venv
 environnement/
 venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Repo-specific: docker compose env file (keep `infra/.env.example` committed)
+infra/.env
+!infra/.env.example
+
+# Local docker data dirs (do not commit)
+infra/robot_db/
 
 # Paramètres du projet Spyder
 .spyderproject
