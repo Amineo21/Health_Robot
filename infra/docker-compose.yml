@@ -19,7 +19,9 @@ services:
         ports:
             - "4000:4000"
         env_file:
-            - path: ./.env
+            - ./.env
+        volumes:
+            - ./map:/app/map
         depends_on:
             - mosquitto
         restart: unless-stopped
@@ -40,7 +42,7 @@ services:
         ports:
             - "3306:3306"
         env_file:
-            - path: ./.env
+            - ./.env
         volumes:
             - robot_db_data:/var/lib/mysql
         restart: unless-stopped

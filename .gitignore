@@ -181,3 +181,10 @@ poésie.toml
 pyrightconfig.json
 
 # Fin de https://www.toptal.com/developers/gitignore/api/python
+
+# Terraform (ne pas committer cache provider ni state)
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log

@@ -2,4 +2,6 @@ fastapi
 uvicorn[standard]
 paho-mqtt
 python-dotenv
+pyyaml
+Pillow
 # For development and testing

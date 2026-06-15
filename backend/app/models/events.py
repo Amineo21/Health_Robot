@@ -102,6 +102,22 @@ class EmergencyEvent(BaseModel):
     restart_procedure: Literal["ADMIN_ONLY"] = "ADMIN_ONLY"
 
 
+class NavigationGoal(BaseModel):
+    x: float
+    y: float
+    mission_id: Optional[str] = None
+    destination_name: Optional[str] = None
+
+
+class NavigationGoalEvent(BaseModel):
+    timestamp: datetime = Field(default_factory=utc_now)
+    mission_id: Optional[str] = None
+    destination_name: Optional[str] = None
+    x: float
+    y: float
+    status: Literal["ACCEPTED"] = "ACCEPTED"
+
+
 class RobotStatus(BaseModel):
     timestamp: datetime = Field(default_factory=utc_now)
     mode: RobotMode = RobotMode.idle
