@@ -12,5 +12,5 @@ COPY . .
 # Exposer le port FastAPI
 EXPOSE 4000
 
-# Commande pour lancer l'app
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "4000"]
+# Appliquer les migrations puis lancer l'app
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 4000"]

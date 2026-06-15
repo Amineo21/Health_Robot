@@ -2,4 +2,13 @@ fastapi
 uvicorn[standard]
 paho-mqtt
 python-dotenv
+sqlalchemy
+alembic
+pymysql
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt<4.1
+pydantic[email]
 # For development and testing
+pytest
+httpx
