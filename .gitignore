@@ -148,6 +148,7 @@ infra/robot_db/
 
 # Documentation mkdocs
 /site
+.opencode
 
 # mypy
 .mypy_cache/
