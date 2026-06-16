@@ -1,0 +1,32 @@
+title: M3 Pro Robotics Course
+description: >-
+  Hands-on ROS 2 course for the Yahboom ROSMASTER M3 Pro.
+  SLAM, Nav2 navigation, 6-axis arm control and the web dashboard.
+remote_theme: just-the-docs/just-the-docs
+
+url: https://pandormedia.github.io
+baseurl: /m3pro-robotics-course
+
+color_scheme: dark
+search_enabled: true
+heading_anchors: true
+back_to_top: true
+back_to_top_text: "Back to top"
+
+aux_links:
+  GitHub repository:
+    - https://github.com/PANDORMedia/m3pro-robotics-course
+
+aux_links_new_tab: true
+
+footer_content: >-
+  M3 Pro Robotics Course. Yahboom ROSMASTER M3 Pro on ROS 2 Humble.
+
+plugins:
+  - jekyll-remote-theme
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+  - README.md

@@ -37,8 +37,10 @@ services:
       - "4000:4000"
     environment:
       - MQTT_BROKER=mqtt://mosquitto:1883
+      - MQTT_ENABLED=true
       - MQTT_HOST=mosquitto
       - MQTT_PORT=1883
+      - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       - DATABASE_URL=mysql+pymysql://${MYSQL_USER:-health_robot}:${MYSQL_PASSWORD:-health_robot}@mysql:3306/${MYSQL_DATABASE:-health_robot}?charset=utf8mb4
       - USER_REPOSITORY_BACKEND=database
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-secret-change-me}
@@ -57,9 +59,13 @@ services:
   frontend:
     build:
       context: ../frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:4000}
     container_name: robot_frontend
     ports:
       - "3000:3000"
+    environment:
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:4000}
     depends_on:
       - backend
     restart: unless-stopped

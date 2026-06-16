@@ -1,0 +1,28 @@
+# ROS 2 / colcon build artifacts
+build/
+install/
+log/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors / local tooling
+.claude/
+.vscode/
+.idea/
+*.swp
+*~
+
+# Jekyll docs site local build
+docs/_site/
+docs/.jekyll-cache/
+docs/.jekyll-metadata
+docs/.bundle/
+docs/vendor/

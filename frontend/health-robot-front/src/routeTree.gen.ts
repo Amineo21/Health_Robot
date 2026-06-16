@@ -21,6 +21,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthSignupRouteImport } from './routes/auth/signup'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
+import { Route as AdminUsersRouteImport } from './routes/admin/users'
 
 const StatusRoute = StatusRouteImport.update({
   id: '/status',
@@ -82,6 +83,11 @@ const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
   path: '/auth/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/missions': typeof MissionsRoute
   '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
+  '/admin/users': typeof AdminUsersRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
@@ -107,6 +114,7 @@ export interface FileRoutesByTo {
   '/missions': typeof MissionsRoute
   '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
+  '/admin/users': typeof AdminUsersRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
@@ -122,6 +130,7 @@ export interface FileRoutesById {
   '/missions': typeof MissionsRoute
   '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
+  '/admin/users': typeof AdminUsersRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/signup': typeof AuthSignupRoute
@@ -138,6 +147,7 @@ export interface FileRouteTypes {
     | '/missions'
     | '/settings'
     | '/status'
+    | '/admin/users'
     | '/auth/forgot-password'
     | '/auth/login'
     | '/auth/signup'
@@ -152,6 +162,7 @@ export interface FileRouteTypes {
     | '/missions'
     | '/settings'
     | '/status'
+    | '/admin/users'
     | '/auth/forgot-password'
     | '/auth/login'
     | '/auth/signup'
@@ -166,6 +177,7 @@ export interface FileRouteTypes {
     | '/missions'
     | '/settings'
     | '/status'
+    | '/admin/users'
     | '/auth/forgot-password'
     | '/auth/login'
     | '/auth/signup'
@@ -181,6 +193,7 @@ export interface RootRouteChildren {
   MissionsRoute: typeof MissionsRoute
   SettingsRoute: typeof SettingsRoute
   StatusRoute: typeof StatusRoute
+  AdminUsersRoute: typeof AdminUsersRoute
   AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
   AuthLoginRoute: typeof AuthLoginRoute
   AuthSignupRoute: typeof AuthSignupRoute
@@ -272,6 +285,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -285,6 +305,7 @@ const rootRouteChildren: RootRouteChildren = {
   MissionsRoute: MissionsRoute,
   SettingsRoute: SettingsRoute,
   StatusRoute: StatusRoute,
+  AdminUsersRoute: AdminUsersRoute,
   AuthForgotPasswordRoute: AuthForgotPasswordRoute,
   AuthLoginRoute: AuthLoginRoute,
   AuthSignupRoute: AuthSignupRoute,

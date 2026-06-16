@@ -1,38 +1,52 @@
-import { useEffect } from 'react'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { Activity, Battery, Gauge, OctagonX, Route as RouteIcon, Users } from 'lucide-react'
 
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { RoleGuard } from '@/components/auth/RoleGuard'
 import { useAuth } from '@/contexts/AuthContext'
+import { useRobot } from '@/lib/robot-context'
+import { ADMIN_ROLES, CAREGIVER_OR_ADMIN_ROLES } from '@/lib/permissions'
 
-export const Route = createFileRoute('/dashboard')({
-  component: DashboardPage,
-})
+export const Route = createFileRoute('/dashboard')({ component: DashboardRoute })
+
+function DashboardRoute() {
+  return (
+    <ProtectedRoute allowedRoles={CAREGIVER_OR_ADMIN_ROLES}>
+      <DashboardPage />
+    </ProtectedRoute>
+  )
+}
 
 function DashboardPage() {
-  const { user, isAuthenticated, isLoading, logout } = useAuth()
-  const navigate = useNavigate()
+  const { user, logout } = useAuth()
+  const { backendStatus, status, statusError, isStatusLoading } = useRobot()
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      navigate({ to: '/auth/login', replace: true })
-    }
-  }, [isAuthenticated, isLoading, navigate])
-
-  if (isLoading) {
-    return (
-      <div className="min-h-[calc(100vh-72px)] bg-slate-950 px-4 py-10 text-white sm:px-6 lg:px-8">
-        <div className="mx-auto flex min-h-[calc(100vh-112px)] max-w-6xl items-center justify-center">
-          <div className="rounded-3xl border border-white/10 bg-white/5 px-6 py-4 text-sm text-slate-300">
-            Chargement du tableau de bord...
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!isAuthenticated || !user) {
+  if (!user) {
     return null
   }
+
+  const cards = [
+    {
+      label: 'Mode robot',
+      value: backendStatus?.mode ?? status,
+      icon: Activity,
+    },
+    {
+      label: 'Batterie',
+      value: backendStatus ? `${backendStatus.battery_level}%` : 'N/A',
+      icon: Battery,
+    },
+    {
+      label: 'Vitesse courante',
+      value: `${backendStatus?.current_speed_mps ?? 0} m/s`,
+      icon: Gauge,
+    },
+    {
+      label: 'Emergency stop',
+      value: backendStatus?.emergency_active ? 'Actif' : 'Inactif',
+      icon: OctagonX,
+    },
+  ]
 
   return (
     <div className="min-h-[calc(100vh-72px)] bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.16),_transparent_26%),linear-gradient(180deg,_#020617_0%,_#0f172a_52%,_#111827_100%)] px-4 py-10 text-white sm:px-6 lg:px-8">
@@ -47,12 +61,25 @@ function DashboardPage() {
                 Bonjour {user.name}
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-                Ton espace de supervision est prêt. Ici tu pourras brancher les missions, les
-                indicateurs robot et les actions de l’équipe.
+                Supervision connectée au backend FastAPI. Les commandes robot passent par l'API et les droits suivent ton rôle.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-3">
+              <Link
+                to="/control"
+                className="rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+              >
+                Contrôler le robot
+              </Link>
+              <RoleGuard allowedRoles={ADMIN_ROLES}>
+                <Link
+                  to="/admin/users"
+                  className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10"
+                >
+                  <Users className="h-4 w-4" /> Users
+                </Link>
+              </RoleGuard>
               <button
                 type="button"
                 onClick={() => void logout()}
@@ -60,28 +87,26 @@ function DashboardPage() {
               >
                 Se déconnecter
               </button>
-              <Link
-                to="/auth/signup"
-                className="rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
-              >
-                Ajouter un compte
-              </Link>
             </div>
           </div>
         </section>
 
+        {statusError && (
+          <div className="rounded-3xl border border-rose-400/30 bg-rose-400/10 p-4 text-sm text-rose-100">
+            Statut robot indisponible : {statusError}
+          </div>
+        )}
+
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            { label: 'Missions actives', value: '08' },
-            { label: 'Alertes', value: '02' },
-            { label: 'Équipe connectée', value: '14' },
-            { label: 'Systèmes en ligne', value: '99.8%' },
-          ].map((card) => (
+          {cards.map((card) => (
             <article
               key={card.label}
               className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/20 backdrop-blur"
             >
-              <p className="text-sm text-slate-400">{card.label}</p>
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-sm text-slate-400">{card.label}</p>
+                <card.icon className="h-5 w-5 text-cyan-200" />
+              </div>
               <p className="mt-3 text-3xl font-black text-white">{card.value}</p>
             </article>
           ))}
@@ -89,28 +114,35 @@ function DashboardPage() {
 
         <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
           <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <h2 className="text-xl font-semibold">Prochaine étape</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-300">
-              Ce dashboard sert de base de migration. Tu peux maintenant raccrocher les vraies
-              données robot, puis remplacer le mock local par ton backend quand tu veux.
-            </p>
+            <h2 className="flex items-center gap-2 text-xl font-semibold">
+              <RouteIcon className="h-5 w-5 text-cyan-200" /> Mission en cours
+            </h2>
+            <dl className="mt-4 grid gap-3 text-sm text-slate-300 sm:grid-cols-2">
+              <InfoItem label="Mission ID" value={backendStatus?.mission_id ?? 'Aucune'} />
+              <InfoItem label="ETA base" value={backendStatus?.eta_to_base_seconds == null ? 'N/A' : `${backendStatus.eta_to_base_seconds}s`} />
+              <InfoItem label="Distance restante" value={backendStatus?.distance_remaining_m == null ? 'N/A' : `${backendStatus.distance_remaining_m}m`} />
+              <InfoItem label="Chargement" value={isStatusLoading ? 'Polling...' : 'Toutes les 3s'} />
+            </dl>
           </article>
 
           <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
             <h2 className="text-xl font-semibold">Compte actif</h2>
             <dl className="mt-4 space-y-3 text-sm text-slate-300">
-              <div className="flex items-center justify-between gap-4">
-                <dt>Email</dt>
-                <dd className="text-right text-white">{user.email}</dd>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <dt>Rôle</dt>
-                <dd className="text-right text-white capitalize">{user.role}</dd>
-              </div>
+              <InfoItem label="Email" value={user.email} />
+              <InfoItem label="Rôle" value={user.role} />
             </dl>
           </article>
         </section>
       </div>
+    </div>
+  )
+}
+
+function InfoItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3">
+      <dt className="text-slate-400">{label}</dt>
+      <dd className="text-right font-medium text-white">{value}</dd>
     </div>
   )
 }

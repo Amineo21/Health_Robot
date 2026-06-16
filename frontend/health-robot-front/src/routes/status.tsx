@@ -1,7 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { Bot, CheckCircle, Clock, Loader2, Radio, Server, Wifi, XCircle } from 'lucide-react'
 
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { useRobot, type ConnectionStatus } from '@/lib/robot-context'
+import { CAREGIVER_OR_ADMIN_ROLES } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
 const statusConfig: Record<ConnectionStatus, { icon: typeof CheckCircle; color: string; bg: string; label: string }> = {
@@ -11,10 +13,19 @@ const statusConfig: Record<ConnectionStatus, { icon: typeof CheckCircle; color: 
 }
 
 const connectionIcons: Record<string, typeof Wifi> = {
-  ROS2: Server,
-  'MQTT Broker': Radio,
-  Robot: Bot,
-  'WebSocket Server': Wifi,
+  'Backend API': Server,
+  'Robot status': Bot,
+  'MQTT command bridge': Radio,
+}
+
+export const Route = createFileRoute('/status')({ component: SystemStatusRoute })
+
+function SystemStatusRoute() {
+  return (
+    <ProtectedRoute allowedRoles={CAREGIVER_OR_ADMIN_ROLES}>
+      <SystemStatusPage />
+    </ProtectedRoute>
+  )
 }
 
 function formatLastPing(date?: Date): string {
@@ -25,31 +36,71 @@ function formatLastPing(date?: Date): string {
   return `${Math.floor(seconds / 60)}m ago`
 }
 
-export const Route = createFileRoute('/status')({ component: SystemStatusPage })
+function formatValue(value: string | number | boolean | null | undefined, unit = '') {
+  if (value === null || value === undefined || value === '') {
+    return 'N/A'
+  }
+  if (typeof value === 'boolean') {
+    return value ? 'Oui' : 'Non'
+  }
+  return `${value}${unit}`
+}
+
+function formatEvent(event: unknown) {
+  if (!event) {
+    return 'Aucun'
+  }
+
+  if (typeof event !== 'object') {
+    return String(event)
+  }
+
+  const record = event as Record<string, unknown>
+  return [record.timestamp, record.status ?? record.reason, record.severity].filter(Boolean).join(' · ')
+}
 
 function SystemStatusPage() {
-  const { connections, telemetry } = useRobot()
+  const { connections, backendStatus, statusError, isStatusLoading } = useRobot()
   const allConnected = connections.every((connection) => connection.status === 'connected')
+
+  const snapshotRows = [
+    { label: 'mode', value: formatValue(backendStatus?.mode) },
+    { label: 'battery_level', value: formatValue(backendStatus?.battery_level, '%') },
+    { label: 'battery_status', value: formatValue(backendStatus?.battery_status) },
+    { label: 'emergency_active', value: formatValue(backendStatus?.emergency_active) },
+    { label: 'mission_id', value: formatValue(backendStatus?.mission_id) },
+    { label: 'eta_to_base_seconds', value: formatValue(backendStatus?.eta_to_base_seconds, 's') },
+    { label: 'distance_remaining_m', value: formatValue(backendStatus?.distance_remaining_m, 'm') },
+    { label: 'current_speed_mps', value: formatValue(backendStatus?.current_speed_mps, ' m/s') },
+    { label: 'last_battery_event', value: formatEvent(backendStatus?.last_battery_event) },
+    { label: 'last_emergency_event', value: formatEvent(backendStatus?.last_emergency_event) },
+  ]
 
   return (
     <div className="space-y-6 px-4 py-6 text-white sm:px-6 lg:px-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">System Status</h1>
-        <p className="text-sm text-slate-400">Monitor system connections and health</p>
+        <p className="text-sm text-slate-400">Snapshot backend /api/robot/status avec polling toutes les 3 secondes</p>
       </div>
 
       <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold">System Health</h2>
-            <p className="mt-1 text-sm text-slate-400">Overall status of all connected systems</p>
+            <h2 className="text-lg font-semibold">Backend Health</h2>
+            <p className="mt-1 text-sm text-slate-400">Etat des appels frontend vers le backend FastAPI</p>
           </div>
           <span className={cn('rounded-full border px-3 py-1 text-sm font-medium', allConnected ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200' : 'border-rose-400/20 bg-rose-400/10 text-rose-200')}>
-            {allConnected ? 'All Systems Operational' : 'System Issues Detected'}
+            {allConnected ? 'Backend reachable' : 'Backend issue'}
           </span>
         </div>
 
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {statusError && (
+          <div className="mt-4 rounded-2xl border border-rose-400/30 bg-rose-400/10 p-4 text-sm text-rose-100">
+            {statusError}
+          </div>
+        )}
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {connections.map((connection) => {
             const config = statusConfig[connection.status]
             const Icon = config.icon
@@ -74,55 +125,24 @@ function SystemStatusPage() {
         </div>
       </article>
 
-      <section className="grid gap-6 lg:grid-cols-2">
-        <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-          <h2 className="text-lg font-semibold">Connection Details</h2>
-          <p className="mt-2 text-sm text-slate-400">Technical connection information</p>
-          <div className="mt-5 space-y-4 text-sm">
-            <div className="flex items-center justify-between gap-4 border-b border-white/10 py-2">
-              <span className="font-medium">ROS2 Bridge</span>
-              <span className="font-mono text-slate-400">ws://localhost:9090</span>
-            </div>
-            <div className="flex items-center justify-between gap-4 border-b border-white/10 py-2">
-              <span className="font-medium">MQTT Broker</span>
-              <span className="font-mono text-slate-400">mqtt://broker:1883</span>
-            </div>
-            <div className="flex items-center justify-between gap-4 border-b border-white/10 py-2">
-              <span className="font-medium">Robot IP</span>
-              <span className="font-mono text-slate-400">192.168.1.100</span>
-            </div>
-            <div className="flex items-center justify-between gap-4 py-2">
-              <span className="font-medium">WebSocket Server</span>
-              <span className="font-mono text-slate-400">ws://localhost:8080</span>
-            </div>
+      <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Robot Status Snapshot</h2>
+            <p className="mt-1 text-sm text-slate-400">Données exposées par le backend MVP</p>
           </div>
-        </article>
+          {isStatusLoading && <span className="text-sm text-cyan-200">Actualisation...</span>}
+        </div>
 
-        <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-          <h2 className="text-lg font-semibold">System Metrics</h2>
-          <p className="mt-2 text-sm text-slate-400">Real-time performance indicators</p>
-          <div className="mt-5 space-y-4 text-sm">
-            <div className="flex items-center justify-between gap-4 border-b border-white/10 py-2">
-              <span className="font-medium">Connection Quality</span>
-              <span className={cn('rounded-full px-3 py-1 font-mono', telemetry.connectionQuality > 80 ? 'bg-emerald-400/10 text-emerald-200' : telemetry.connectionQuality > 50 ? 'bg-amber-400/10 text-amber-200' : 'bg-rose-400/10 text-rose-200')}>
-                {Math.round(telemetry.connectionQuality)}%
-              </span>
+        <div className="mt-5 grid gap-3 md:grid-cols-2">
+          {snapshotRows.map((row) => (
+            <div key={row.label} className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm">
+              <span className="font-mono text-slate-400">{row.label}</span>
+              <span className="text-right font-medium text-white">{row.value}</span>
             </div>
-            <div className="flex items-center justify-between gap-4 border-b border-white/10 py-2">
-              <span className="font-medium">Latency</span>
-              <span className="font-mono text-slate-400">12ms</span>
-            </div>
-            <div className="flex items-center justify-between gap-4 border-b border-white/10 py-2">
-              <span className="font-medium">Packet Loss</span>
-              <span className="font-mono text-slate-400">0.1%</span>
-            </div>
-            <div className="flex items-center justify-between gap-4 py-2">
-              <span className="font-medium">Uptime</span>
-              <span className="font-mono text-slate-400">4h 32m</span>
-            </div>
-          </div>
-        </article>
-      </section>
+          ))}
+        </div>
+      </article>
     </div>
   )
 }

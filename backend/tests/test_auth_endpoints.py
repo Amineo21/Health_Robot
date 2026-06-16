@@ -19,6 +19,20 @@ def test_login_admin_valid(client: TestClient) -> None:
     assert "password_hash" not in payload["user"]
 
 
+def test_login_preflight_allows_frontend_origin(client: TestClient) -> None:
+    response = client.options(
+        "/api/auth/login",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type,authorization",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+
+
 def test_login_caregiver_valid(
     client: TestClient,
     create_caregiver: Callable[[str], tuple[str, str, str]],

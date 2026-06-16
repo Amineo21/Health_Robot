@@ -7,10 +7,10 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import settings
 from app.infrastructure.database.base import Base
-from app.infrastructure.database.models import UserModel
+from app.infrastructure.database.models import RobotSettingsModel, UserModel
 
 # Import models so SQLAlchemy metadata is populated for autogeneration.
-_ = UserModel
+_ = (RobotSettingsModel, UserModel)
 
 config = context.config
 

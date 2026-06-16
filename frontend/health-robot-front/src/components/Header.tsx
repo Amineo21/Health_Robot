@@ -1,10 +1,34 @@
-import { Link } from '@tanstack/react-router'
-
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
-import { Home, Menu, X, LayoutDashboard, LogIn, ListTodo, Activity, Map, Settings, Truck, UtensilsCrossed, Gamepad2 } from 'lucide-react'
+import { Activity, Gamepad2, Home, LayoutDashboard, LogIn, LogOut, Map, Menu, Settings, Shield, Users, X } from 'lucide-react'
+
+import { useAuth } from '@/contexts/AuthContext'
+import { canUseAdminControls } from '@/lib/permissions'
+
+const authenticatedLinks = [
+  { to: '/dashboard' as const, label: 'Dashboard', mobileLabel: 'Dashboard', icon: LayoutDashboard },
+  { to: '/control' as const, label: 'Control', mobileLabel: 'Robot Control', icon: Gamepad2 },
+  { to: '/map' as const, label: 'Map', mobileLabel: 'Live Map', icon: Map },
+  { to: '/status' as const, label: 'Status', mobileLabel: 'System Status', icon: Activity },
+]
+
+const adminLinks = [
+  { to: '/admin/users' as const, label: 'Users', mobileLabel: 'Users', icon: Users },
+  { to: '/settings' as const, label: 'Settings', mobileLabel: 'Settings', icon: Settings },
+]
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
+  const { user, isAuthenticated, logout } = useAuth()
+  const navigate = useNavigate()
+  const isAdmin = canUseAdminControls(user)
+  const visibleLinks = isAuthenticated ? [...authenticatedLinks, ...(isAdmin ? adminLinks : [])] : []
+
+  const handleLogout = async () => {
+    await logout()
+    setIsOpen(false)
+    navigate({ to: '/auth/login', replace: true })
+  }
 
   return (
     <>
@@ -29,37 +53,35 @@ export default function Header() {
           <Link to="/" className="nav-link px-3">
             <Home size={18} /> <span className="hidden sm:inline">Home</span>
           </Link>
-          <Link to="/dashboard" className="nav-link px-3">
-            <LayoutDashboard size={18} /> <span className="hidden sm:inline">Dashboard</span>
-          </Link>
-          <Link to="/auth/login" className="nav-link px-3">
-            <LogIn size={18} /> <span className="hidden sm:inline">Login</span>
-          </Link>
-          <a href="/control" className="nav-link px-3 hover:text-cyan-200">
-            <Gamepad2 size={18} /> <span className="hidden sm:inline">Control</span>
-          </a>
-          <a href="/missions" className="nav-link px-3 hover:text-cyan-200">
-            <ListTodo size={18} /> <span className="hidden sm:inline">Missions</span>
-          </a>
-          <a href="/map" className="nav-link px-3 hover:text-cyan-200">
-            <Map size={18} /> <span className="hidden sm:inline">Map</span>
-          </a>
-          <a href="/deliveries" className="nav-link px-3 hover:text-cyan-200">
-            <Truck size={18} /> <span className="hidden sm:inline">Deliveries</span>
-          </a>
-          <a href="/meals" className="nav-link px-3 hover:text-cyan-200">
-            <UtensilsCrossed size={18} /> <span className="hidden sm:inline">Meals</span>
-          </a>
-          <a href="/status" className="nav-link px-3 hover:text-cyan-200">
-            <Activity size={18} /> <span className="hidden sm:inline">Status</span>
-          </a>
-          <a href="/settings" className="nav-link px-3 hover:text-cyan-200">
-            <Settings size={18} /> <span className="hidden sm:inline">Settings</span>
-          </a>
+
+          {visibleLinks.map((item) => (
+            <Link key={item.to} to={item.to} className="nav-link px-3">
+              <item.icon size={18} /> <span className="hidden sm:inline">{item.label}</span>
+            </Link>
+          ))}
+
+          {!isAuthenticated && (
+            <Link to="/auth/login" className="nav-link px-3">
+              <LogIn size={18} /> <span className="hidden sm:inline">Login</span>
+            </Link>
+          )}
+
+          {isAuthenticated && user && (
+            <div className="ml-2 flex items-center gap-3 border-l border-white/10 pl-3">
+              <div className="hidden text-right text-xs leading-tight xl:block">
+                <p className="font-semibold text-white">{user.name}</p>
+                <p className="inline-flex items-center justify-end gap-1 text-cyan-200">
+                  <Shield className="h-3 w-3" /> {user.role}
+                </p>
+              </div>
+              <button type="button" onClick={() => void handleLogout()} className="nav-link px-3">
+                <LogOut size={18} /> <span className="hidden sm:inline">Logout</span>
+              </button>
+            </div>
+          )}
         </nav>
       </header>
 
-      {/* Mobile Menu Overlay */}
       {isOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity duration-300 lg:hidden"
@@ -67,7 +89,6 @@ export default function Header() {
         />
       )}
 
-      {/* Mobile Sidebar */}
       <aside
         className={`fixed top-0 left-0 h-full w-80 bg-gradient-to-b from-slate-900 to-slate-950 text-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
@@ -89,57 +110,50 @@ export default function Header() {
             to="/"
             onClick={() => setIsOpen(false)}
             className="nav-link"
-            activeProps={{
-              className: 'nav-link-active',
-            }}
+            activeProps={{ className: 'nav-link-active' }}
           >
             <Home size={18} /> <span>Home</span>
           </Link>
-          <Link
-            to="/dashboard"
-            onClick={() => setIsOpen(false)}
-            className="nav-link"
-            activeProps={{
-              className: 'nav-link-active',
-            }}
-          >
-            <LayoutDashboard size={18} /> <span>Dashboard</span>
-          </Link>
-          <Link
-            to="/auth/login"
-            onClick={() => setIsOpen(false)}
-            className="nav-link"
-            activeProps={{
-              className: 'nav-link-active',
-            }}
-          >
-            <LogIn size={18} /> <span>Login</span>
-          </Link>
 
-          <div className="my-2 border-t border-white/10"></div>
+          {!isAuthenticated && (
+            <Link
+              to="/auth/login"
+              onClick={() => setIsOpen(false)}
+              className="nav-link"
+              activeProps={{ className: 'nav-link-active' }}
+            >
+              <LogIn size={18} /> <span>Login</span>
+            </Link>
+          )}
 
-          <a href="/control" onClick={() => setIsOpen(false)} className="nav-link">
-            <Gamepad2 size={18} /> <span>Robot Control</span>
-          </a>
-          <a href="/missions" onClick={() => setIsOpen(false)} className="nav-link">
-            <ListTodo size={18} /> <span>Missions</span>
-          </a>
-          <a href="/map" onClick={() => setIsOpen(false)} className="nav-link">
-            <Map size={18} /> <span>Live Map</span>
-          </a>
-          <a href="/deliveries" onClick={() => setIsOpen(false)} className="nav-link">
-            <Truck size={18} /> <span>Deliveries</span>
-          </a>
-          <a href="/meals" onClick={() => setIsOpen(false)} className="nav-link">
-            <UtensilsCrossed size={18} /> <span>Meal Distribution</span>
-          </a>
-          <a href="/status" onClick={() => setIsOpen(false)} className="nav-link">
-            <Activity size={18} /> <span>System Status</span>
-          </a>
-          <a href="/settings" onClick={() => setIsOpen(false)} className="nav-link">
-            <Settings size={18} /> <span>Settings</span>
-          </a>
+          {isAuthenticated && <div className="my-2 border-t border-white/10"></div>}
+
+          {visibleLinks.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              onClick={() => setIsOpen(false)}
+              className="nav-link"
+              activeProps={{ className: 'nav-link-active' }}
+            >
+              <item.icon size={18} /> <span>{item.mobileLabel}</span>
+            </Link>
+          ))}
         </nav>
+
+        {isAuthenticated && user && (
+          <div className="border-t border-white/10 p-4 text-sm text-slate-300">
+            <p className="font-semibold text-white">{user.name}</p>
+            <p className="mt-1 text-xs uppercase tracking-widest text-cyan-200">{user.role}</p>
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10"
+            >
+              <LogOut className="h-4 w-4" /> Se déconnecter
+            </button>
+          </div>
+        )}
 
         <div className="border-t border-white/10 p-4 text-xs text-slate-400">
           <p>CareBot v2.1.0</p>

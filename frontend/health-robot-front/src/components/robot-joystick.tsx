@@ -1,17 +1,37 @@
 import { useState, useRef, useEffect } from 'react'
 import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react'
 
-export function RobotJoystick() {
+interface RobotJoystickProps {
+  disabled?: boolean
+  onTeleop?: (payload: { linear_x: number; angular_z: number; duration_ms: number }) => Promise<void> | void
+}
+
+export function RobotJoystick({ disabled = false, onTeleop }: RobotJoystickProps) {
   const [direction, setDirection] = useState<{ x: number; y: number } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [isPressed, setIsPressed] = useState(false)
 
+  const emitTeleop = (x: number, y: number) => {
+    const linear_x = y < 0 ? 0.1 : y > 0 ? -0.1 : 0
+    const angular_z = x < 0 ? 0.2 : x > 0 ? -0.2 : 0
+    void onTeleop?.({ linear_x, angular_z, duration_ms: 300 })
+  }
+
   const handleMouseDown = (x: number, y: number) => {
+    if (disabled) {
+      return
+    }
+
     setIsPressed(true)
     setDirection({ x, y })
+    emitTeleop(x, y)
   }
 
   const handleMouseUp = () => {
+    if (isPressed) {
+      emitTeleop(0, 0)
+    }
+
     setIsPressed(false)
     setDirection(null)
   }
@@ -50,6 +70,7 @@ export function RobotJoystick() {
           onMouseDown={() => handleMouseDown(0, -1)}
           onTouchStart={() => handleMouseDown(0, -1)}
           onTouchEnd={handleMouseUp}
+          disabled={disabled}
           className={`p-4 rounded-lg transition-all ${
             isActive('up')
               ? 'bg-cyan-500 text-white scale-110'
@@ -67,6 +88,7 @@ export function RobotJoystick() {
           onMouseDown={() => handleMouseDown(-1, 0)}
           onTouchStart={() => handleMouseDown(-1, 0)}
           onTouchEnd={handleMouseUp}
+          disabled={disabled}
           className={`p-4 rounded-lg transition-all ${
             isActive('left')
               ? 'bg-cyan-500 text-white scale-110'
@@ -91,6 +113,7 @@ export function RobotJoystick() {
           onMouseDown={() => handleMouseDown(1, 0)}
           onTouchStart={() => handleMouseDown(1, 0)}
           onTouchEnd={handleMouseUp}
+          disabled={disabled}
           className={`p-4 rounded-lg transition-all ${
             isActive('right')
               ? 'bg-cyan-500 text-white scale-110'
@@ -108,6 +131,7 @@ export function RobotJoystick() {
           onMouseDown={() => handleMouseDown(0, 1)}
           onTouchStart={() => handleMouseDown(0, 1)}
           onTouchEnd={handleMouseUp}
+          disabled={disabled}
           className={`p-4 rounded-lg transition-all ${
             isActive('down')
               ? 'bg-cyan-500 text-white scale-110'
@@ -126,7 +150,8 @@ export function RobotJoystick() {
         {isActive('down') && 'Moving Backward'}
         {isActive('left') && 'Turning Left'}
         {isActive('right') && 'Turning Right'}
-        {!direction && 'Ready for control'}
+        {disabled && 'Teleop reserved for admins'}
+        {!disabled && !direction && 'Ready for control'}
       </div>
     </div>
   )

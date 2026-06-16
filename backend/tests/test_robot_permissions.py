@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 from fastapi.testclient import TestClient
 
+from app.domain.entities.robot import RobotMapMetadata, RobotPose, RobotRuntimeTelemetry
 from tests.helpers import ADMIN_EMAIL, ADMIN_PASSWORD, auth_headers, login
 
 
@@ -31,6 +32,30 @@ def test_robot_status_admin(client: TestClient) -> None:
     response = client.get("/api/robot/status", headers=auth_headers(token))
 
     assert response.status_code == 200
+
+
+def test_robot_status_exposes_runtime_map_and_pose(client: TestClient) -> None:
+    token = login(client, ADMIN_EMAIL, ADMIN_PASSWORD)
+    client.app.state.robot_state_repository.update_runtime(
+        RobotRuntimeTelemetry(
+            pose=RobotPose(x=0.75, y=1.25),
+            map=RobotMapMetadata(width=131, height=144, resolution=0.05, origin_x=-3.15, origin_y=-2.99),
+            min_obstacle_distance_m=0.4,
+        )
+    )
+
+    response = client.get("/api/robot/status", headers=auth_headers(token))
+
+    assert response.status_code == 200
+    assert response.json()["pose"] == {"x": 0.75, "y": 1.25, "yaw": None}
+    assert response.json()["map"] == {
+        "width": 131,
+        "height": 144,
+        "resolution": 0.05,
+        "origin_x": -3.15,
+        "origin_y": -2.99,
+    }
+    assert response.json()["min_obstacle_distance_m"] == 0.4
 
 
 def test_emergency_caregiver(

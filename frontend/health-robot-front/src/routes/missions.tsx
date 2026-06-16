@@ -3,7 +3,9 @@ import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { CheckCircle, Clock, Plus, XCircle } from 'lucide-react'
 
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { useRobot, type MissionType } from '@/lib/robot-context'
+import { CAREGIVER_OR_ADMIN_ROLES } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
 const rooms = [
@@ -20,7 +22,15 @@ const statusConfig = {
   cancelled: { label: 'Cancelled', icon: XCircle, color: 'text-rose-200', bg: 'bg-rose-400/10' },
 } as const
 
-export const Route = createFileRoute('/missions')({ component: MissionsPage })
+export const Route = createFileRoute('/missions')({ component: MissionsRoute })
+
+function MissionsRoute() {
+  return (
+    <ProtectedRoute allowedRoles={CAREGIVER_OR_ADMIN_ROLES}>
+      <MissionsPage />
+    </ProtectedRoute>
+  )
+}
 
 function MissionsPage() {
   const { missions, addMission, cancelMission } = useRobot()

@@ -46,6 +46,22 @@ class EtaSource(str, Enum):
 
 
 @dataclass(frozen=True)
+class RobotPose:
+    x: float
+    y: float
+    yaw: float | None = None
+
+
+@dataclass(frozen=True)
+class RobotMapMetadata:
+    width: int
+    height: int
+    resolution: float
+    origin_x: float = 0.0
+    origin_y: float = 0.0
+
+
+@dataclass(frozen=True)
 class BatteryTelemetry:
     level: int
     voltage: float | None = None
@@ -88,6 +104,17 @@ class NavigationEtaTelemetry:
 
 
 @dataclass(frozen=True)
+class RobotRuntimeTelemetry:
+    mode: RobotMode | None = None
+    battery_level: int | None = None
+    emergency_active: bool | None = None
+    pose: RobotPose | None = None
+    map: RobotMapMetadata | None = None
+    min_obstacle_distance_m: float | None = None
+    current_speed_mps: float | None = None
+
+
+@dataclass(frozen=True)
 class EmergencyStopRequest:
     source: EmergencySource
     reason: str
@@ -119,5 +146,8 @@ class RobotStatus:
     path_distance_m: float | None = None
     distance_remaining_m: float | None = None
     current_speed_mps: float | None = None
+    pose: RobotPose | None = None
+    map: RobotMapMetadata | None = None
+    min_obstacle_distance_m: float | None = None
     last_battery_event: BatteryEvent | None = None
     last_emergency_event: EmergencyEvent | None = None

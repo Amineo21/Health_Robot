@@ -1,10 +1,20 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { CheckCircle, Clock, Package, Truck } from 'lucide-react'
 
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { useRobot } from '@/lib/robot-context'
+import { CAREGIVER_OR_ADMIN_ROLES } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
-export const Route = createFileRoute('/deliveries')({ component: DeliveriesPage })
+export const Route = createFileRoute('/deliveries')({ component: DeliveriesRoute })
+
+function DeliveriesRoute() {
+  return (
+    <ProtectedRoute allowedRoles={CAREGIVER_OR_ADMIN_ROLES}>
+      <DeliveriesPage />
+    </ProtectedRoute>
+  )
+}
 
 function DeliveriesPage() {
   const { missions, deliveriesToday } = useRobot()

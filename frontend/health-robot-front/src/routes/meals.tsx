@@ -3,7 +3,9 @@ import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { CheckCircle, Clock, Play, UtensilsCrossed, Users } from 'lucide-react'
 
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { useRobot } from '@/lib/robot-context'
+import { CAREGIVER_OR_ADMIN_ROLES } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
 const mealSchedule = [
@@ -22,7 +24,15 @@ const rooms = [
   { id: '203', resident: 'Henri R.', delivered: false },
 ]
 
-export const Route = createFileRoute('/meals')({ component: MealsPage })
+export const Route = createFileRoute('/meals')({ component: MealsRoute })
+
+function MealsRoute() {
+  return (
+    <ProtectedRoute allowedRoles={CAREGIVER_OR_ADMIN_ROLES}>
+      <MealsPage />
+    </ProtectedRoute>
+  )
+}
 
 function MealsPage() {
   const { addMission, missions } = useRobot()

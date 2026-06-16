@@ -10,7 +10,9 @@ from app.domain.entities.robot import (
     EmergencyEvent,
     NavigationEtaTelemetry,
     RobotMode,
+    RobotRuntimeTelemetry,
     RobotStatus,
+    utc_now,
 )
 
 
@@ -35,6 +37,7 @@ class InMemoryRobotStateRepository:
 
             self._status = replace(
                 self._status,
+                timestamp=utc_now(),
                 battery_level=event.battery_level,
                 battery_status=event.status,
                 eta_to_base_seconds=event.eta_seconds,
@@ -48,12 +51,13 @@ class InMemoryRobotStateRepository:
 
     def set_mode(self, mode: RobotMode, mission_id: str | None = None) -> RobotStatus:
         with self._lock:
-            self._status = replace(self._status, mode=mode, mission_id=mission_id)
+            self._status = replace(self._status, timestamp=utc_now(), mode=mode, mission_id=mission_id)
             return deepcopy(self._status)
 
     def update_navigation_eta(self, telemetry: NavigationEtaTelemetry) -> RobotStatus:
         with self._lock:
             update = {
+                "timestamp": utc_now(),
                 "eta_to_base_seconds": telemetry.eta_seconds,
                 "eta_source": telemetry.eta_source,
                 "path_distance_m": telemetry.path_distance_m,
@@ -62,6 +66,29 @@ class InMemoryRobotStateRepository:
             }
             if telemetry.mission_id is not None:
                 update["mission_id"] = telemetry.mission_id
+
+            self._status = replace(self._status, **update)
+            return deepcopy(self._status)
+
+    def update_runtime(self, telemetry: RobotRuntimeTelemetry) -> RobotStatus:
+        with self._lock:
+            update = {"timestamp": utc_now()}
+            if telemetry.mode is not None:
+                update["mode"] = telemetry.mode
+            if telemetry.battery_level is not None:
+                update["battery_level"] = telemetry.battery_level
+            if telemetry.emergency_active is not None:
+                update["emergency_active"] = telemetry.emergency_active
+                if telemetry.emergency_active:
+                    update["mode"] = RobotMode.emergency_stop
+            if telemetry.pose is not None:
+                update["pose"] = telemetry.pose
+            if telemetry.map is not None:
+                update["map"] = telemetry.map
+            if telemetry.min_obstacle_distance_m is not None:
+                update["min_obstacle_distance_m"] = telemetry.min_obstacle_distance_m
+            if telemetry.current_speed_mps is not None:
+                update["current_speed_mps"] = telemetry.current_speed_mps
 
             self._status = replace(self._status, **update)
             return deepcopy(self._status)
@@ -94,6 +121,7 @@ class InMemoryRobotStateRepository:
         with self._lock:
             self._status = replace(
                 self._status,
+                timestamp=utc_now(),
                 emergency_active=True,
                 mode=RobotMode.emergency_stop,
                 last_emergency_event=event,
@@ -104,6 +132,7 @@ class InMemoryRobotStateRepository:
         with self._lock:
             self._status = replace(
                 self._status,
+                timestamp=utc_now(),
                 emergency_active=False,
                 mode=RobotMode.idle,
             )

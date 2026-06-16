@@ -1,4 +1,7 @@
 ROBOT_COMMAND_TOPIC = "robot/command"
+ROBOT_COMMAND_NAVIGATION_TOPIC = "robot/command/navigation"
+ROBOT_COMMAND_TELEOP_TOPIC = "robot/command/teleop"
+ROBOT_COMMAND_SAFETY_TOPIC = "robot/command/safety"
 ROBOT_STATUS_TOPIC = "robot/status"
 ROBOT_BATTERY_TOPIC = "robot/battery"
 ROBOT_EMERGENCY_TOPIC = "robot/emergency"

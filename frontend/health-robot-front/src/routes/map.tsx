@@ -1,9 +1,19 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { Bot, MapPin, Navigation } from 'lucide-react'
 
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { useRobot } from '@/lib/robot-context'
+import { CAREGIVER_OR_ADMIN_ROLES } from '@/lib/permissions'
 
-export const Route = createFileRoute('/map')({ component: MapPage })
+export const Route = createFileRoute('/map')({ component: MapRoute })
+
+function MapRoute() {
+  return (
+    <ProtectedRoute allowedRoles={CAREGIVER_OR_ADMIN_ROLES}>
+      <MapPage />
+    </ProtectedRoute>
+  )
+}
 
 function MapPage() {
   const { telemetry, activeMission, status } = useRobot()
