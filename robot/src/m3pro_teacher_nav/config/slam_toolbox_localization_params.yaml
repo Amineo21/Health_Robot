@@ -1,0 +1,91 @@
+# ============================================================
+# slam_toolbox in LOCALIZATION mode — loads a pre-built map
+# and localizes the robot via scan-matching against it.
+#
+# Use this after you've finished mapping:
+#   1. Save map from the dashboard (Save Map button) → /tmp/m3pro_map.{pgm,yaml,data,posegraph}
+#   2. Launch the navigation stack:
+#      ros2 launch m3pro_teacher_nav localize.launch.py map:=/tmp/m3pro_map
+#
+# Key differences vs mapping config:
+#   - mode: localization (slam_toolbox subscribes to /initialpose, publishes map→odom via scan-match)
+#   - map_file_name: <path without .data/.posegraph suffix>
+#   - map_start_at_dock: true (robot starts at map origin until /initialpose is received)
+#   - No new scans added to the map (map is frozen)
+# ============================================================
+slam_toolbox:
+  ros__parameters:
+    solver_plugin: solver_plugins::CeresSolver
+    ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
+    ceres_preconditioner: SCHUR_JACOBI
+    ceres_trust_strategy: LEVENBERG_MARQUARDT
+    ceres_dogleg_type: TRADITIONAL_DOGLEG
+    ceres_loss_function: None
+
+    # ---------- frames ----------
+    odom_frame: odom
+    map_frame: map
+    base_frame: base_footprint
+    scan_topic: /scan_multi
+    use_scan_matching: true
+    use_scan_barycenter: true
+
+    # ---------- localization mode ----------
+    mode: localization
+    # Without trailing extension. slam_toolbox loads <name>.data + <name>.posegraph.
+    # Overridden at launch time from the `map` launch arg.
+    # /root/maps is bind-mounted from /home/jetson/robot_maps → persistent.
+    map_file_name: /root/maps/m3pro_map
+    # Start the robot at the map origin. /initialpose will override this at any time.
+    map_start_at_dock: true
+
+    # ---------- map / processing ----------
+    map_update_interval: 3.0
+    resolution: 0.05
+    max_laser_range: 3.5
+    # Match the more conservative mapping config. On the Nano, nav-mode
+    # localization was overflowing slam_toolbox's message filter and then
+    # correcting in bursts, which looks like pose jumps.
+    minimum_time_interval: 1.0
+    # Generous — Jetson under full load.
+    transform_timeout: 1.5
+    tf_buffer_duration: 30.0
+
+    # ---------- thresholds ----------
+    minimum_travel_distance: 0.5
+    minimum_travel_heading: 0.5
+
+    # ---------- scan matching (tighter than mapping — map is fixed) ----------
+    scan_buffer_size: 5
+    scan_buffer_maximum_scan_distance: 3.5
+    link_match_minimum_response_fine: 0.1
+    link_scan_maximum_distance: 1.5
+    loop_search_maximum_distance: 3.0
+
+    # ---------- correlation / loop closure ----------
+    # Keep localization in continuous scan-matching mode. The mapping config
+    # already disables loop closing because it produced bad global snaps on
+    # this robot in feature-poor indoor spaces.
+    do_loop_closing: false
+    loop_match_minimum_chain_size: 10
+    loop_match_maximum_variance_coarse: 3.0
+    loop_match_minimum_response_coarse: 0.35
+    loop_match_minimum_response_fine: 0.45
+
+    correlation_search_space_dimension: 0.5
+    correlation_search_space_resolution: 0.01
+    correlation_search_space_smear_deviation: 0.1
+
+    loop_search_space_dimension: 8.0
+    loop_search_space_resolution: 0.05
+    loop_search_space_smear_deviation: 0.03
+
+    # ---------- performance (tuned for Jetson) ----------
+    distance_variance_penalty: 0.5
+    angle_variance_penalty: 1.0
+    fine_search_angle_offset: 0.00349
+    coarse_search_angle_offset: 0.349
+    coarse_angle_resolution: 0.0349
+    minimum_angle_penalty: 0.9
+    minimum_distance_penalty: 0.5
+    use_response_expansion: true
