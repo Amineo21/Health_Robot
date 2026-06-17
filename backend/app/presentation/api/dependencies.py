@@ -11,6 +11,8 @@ from app.application.use_cases.container import ApplicationUseCases
 from app.application.use_cases.get_authenticated_user import AuthenticatedUserNotFoundError
 from app.core.config import settings
 from app.domain.entities.user import User, UserRole
+from app.infrastructure.robot_maps.dashboard_client import RobotDashboardClient
+from app.infrastructure.rosbridge.mqtt_rosbridge_bridge import MqttRosbridgeBridge
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -20,6 +22,18 @@ def get_use_cases(request: Request) -> ApplicationUseCases:
 
 
 UseCasesDep = Annotated[ApplicationUseCases, Depends(get_use_cases)]
+
+
+def get_robot_rosbridge_bridge(request: Request) -> MqttRosbridgeBridge:
+    return request.app.state.robot_rosbridge_bridge
+
+
+def get_robot_dashboard_client(request: Request) -> RobotDashboardClient:
+    return request.app.state.robot_dashboard_client
+
+
+RobotRosbridgeBridgeDep = Annotated[MqttRosbridgeBridge, Depends(get_robot_rosbridge_bridge)]
+RobotDashboardClientDep = Annotated[RobotDashboardClient, Depends(get_robot_dashboard_client)]
 
 
 def _unauthorized(detail: str = "Not authenticated") -> HTTPException:

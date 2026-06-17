@@ -59,6 +59,36 @@ export interface RobotMapMetadata {
   origin_y: number
 }
 
+export interface RobotMapSnapshot extends RobotMapMetadata {
+  data: number[]
+  updated_at: number
+}
+
+export interface SavedRobotMap {
+  name: string
+  parts: Record<string, string>
+  mtime: number
+  size: number
+  loadable: boolean
+}
+
+export interface SavedRobotMapsResponse {
+  maps: SavedRobotMap[]
+}
+
+export interface RobotMapOperationResponse {
+  ok: boolean
+  result: Record<string, unknown>
+}
+
+export interface SaveRobotMapResponse {
+  ok: boolean
+  name: string
+  base_path: string
+  occupancy?: Record<string, unknown> | null
+  pose_graph?: Record<string, unknown> | null
+}
+
 export interface NavigatePayload {
   x: number
   y: number
@@ -122,5 +152,42 @@ export function clearCostmaps() {
 export function resetEmergency() {
   return apiFetch<{ status: string }>('/api/safety/emergency/reset?actor=frontend', {
     method: 'POST',
+  })
+}
+
+export function fetchCurrentRobotMap() {
+  return apiFetch<RobotMapSnapshot>('/api/robot/maps/current')
+}
+
+export function fetchSavedRobotMaps() {
+  return apiFetch<SavedRobotMapsResponse>('/api/robot/maps')
+}
+
+export function fetchRobotMapMode() {
+  return apiFetch<RobotMapOperationResponse>('/api/robot/maps/mode')
+}
+
+export function startMappingMode() {
+  return apiFetch<RobotMapOperationResponse>('/api/robot/maps/mapping/start', {
+    method: 'POST',
+  })
+}
+
+export function saveCurrentRobotMap(name: string) {
+  return apiFetch<SaveRobotMapResponse>('/api/robot/maps/save', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  })
+}
+
+export function loadSavedRobotMap(name: string) {
+  return apiFetch<RobotMapOperationResponse>(`/api/robot/maps/${encodeURIComponent(name)}/load`, {
+    method: 'POST',
+  })
+}
+
+export function deleteSavedRobotMap(name: string) {
+  return apiFetch<RobotMapOperationResponse>(`/api/robot/maps/${encodeURIComponent(name)}`, {
+    method: 'DELETE',
   })
 }

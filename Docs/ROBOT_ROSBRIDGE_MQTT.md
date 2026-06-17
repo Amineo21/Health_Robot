@@ -19,12 +19,25 @@ Runtime variables:
 ```text
 ROBOT_ROSBRIDGE_ENABLED=true
 ROBOT_ROSBRIDGE_URL=ws://10.10.220.180:9090
+ROBOT_DASHBOARD_URL=http://10.10.220.180:8080
+ROBOT_MAPS_DIRECTORY=/root/maps
 ROBOT_BASE_X=0.0
 ROBOT_BASE_Y=0.0
 ROBOT_BASE_YAW=0.0
 ```
 
 These are wired in `infra/docker-compose.yml` for the backend service.
+
+## Map Management
+
+Saved maps live inside the robot Docker container under `/root/maps`. The backend exposes authenticated endpoints under `/api/robot/maps`:
+
+- `GET /api/robot/maps/current` returns the latest `/map` OccupancyGrid snapshot received from rosbridge.
+- `GET /api/robot/maps` proxies the robot dashboard map list from `/root/maps`.
+- `POST /api/robot/maps/mapping/start` switches the robot stack to mapping mode through the robot dashboard service.
+- `POST /api/robot/maps/save` saves the current SLAM map to `/root/maps/<name>` using `/slam_toolbox/save_map` and `/slam_toolbox/serialize_map` through rosbridge.
+- `POST /api/robot/maps/{name}/load` switches to navigation mode with `/root/maps/<name>.yaml`.
+- `DELETE /api/robot/maps/{name}` deletes the matching `.yaml`, `.pgm`, `.data`, and `.posegraph` files.
 
 ## Safety Boundary
 

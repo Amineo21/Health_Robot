@@ -5,7 +5,9 @@ import logging
 import math
 import threading
 import time
+from copy import deepcopy
 from typing import Any
+from uuid import uuid4
 
 import paho.mqtt.client as mqtt
 
@@ -65,6 +67,10 @@ class MqttRosbridgeBridge:
         self._websocket: Any | None = None
         self._websocket_connected = False
         self._websocket_lock = threading.Lock()
+        self._service_call_lock = threading.Lock()
+        self._service_calls: dict[str, dict[str, Any]] = {}
+        self._latest_map_lock = threading.Lock()
+        self._latest_map_snapshot: dict[str, Any] | None = None
         self._zero_twist_timers: list[threading.Timer] = []
         self._emergency_active = False
 
@@ -207,12 +213,23 @@ class MqttRosbridgeBridge:
             return
 
         if message.get("op") != "publish":
+            if message.get("op") == "service_response":
+                self._handle_rosbridge_service_response(message)
             return
 
         topic = message.get("topic")
         ros_message = message.get("msg")
         if not isinstance(topic, str) or not isinstance(ros_message, dict):
             return
+
+        if topic == "/map":
+            try:
+                snapshot = map_snapshot_from_ros_message(ros_message)
+            except (KeyError, TypeError, ValueError):
+                snapshot = None
+            if snapshot is not None:
+                with self._latest_map_lock:
+                    self._latest_map_snapshot = snapshot
 
         try:
             telemetry = telemetry_payload_from_ros_message(topic, ros_message)
@@ -222,6 +239,17 @@ class MqttRosbridgeBridge:
             return
         mqtt_topic, payload = telemetry
         self._mqtt_client.publish(mqtt_topic, json.dumps(payload), qos=1)
+
+    def _handle_rosbridge_service_response(self, message: dict[str, Any]) -> None:
+        call_id = message.get("id")
+        if not isinstance(call_id, str):
+            return
+        with self._service_call_lock:
+            pending = self._service_calls.get(call_id)
+        if pending is None:
+            return
+        pending["response"] = message
+        pending["event"].set()
 
     def _handle_robot_command(self, command_type: str, payload: dict[str, Any]) -> None:
         if command_type != "emergency_stop" and self._emergency_active:
@@ -357,19 +385,78 @@ class MqttRosbridgeBridge:
                 }
             )
 
-    def _send_rosbridge(self, payload: dict[str, Any]) -> None:
+    def get_latest_map_snapshot(self) -> dict[str, Any] | None:
+        with self._latest_map_lock:
+            return deepcopy(self._latest_map_snapshot)
+
+    def save_map(self, base_path: str) -> dict[str, Any]:
+        occupancy = self.call_service(
+            "/slam_toolbox/save_map",
+            "slam_toolbox/srv/SaveMap",
+            {"name": {"data": base_path}},
+            timeout_seconds=20.0,
+        )
+        pose_graph = self.call_service(
+            "/slam_toolbox/serialize_map",
+            "slam_toolbox/srv/SerializePoseGraph",
+            {"filename": base_path},
+            timeout_seconds=20.0,
+        )
+        return {"occupancy": occupancy, "pose_graph": pose_graph}
+
+    def call_service(
+        self,
+        service: str,
+        service_type: str,
+        args: dict[str, Any] | None = None,
+        timeout_seconds: float = 8.0,
+    ) -> dict[str, Any]:
+        call_id = f"health-robot-{uuid4()}"
+        event = threading.Event()
+        with self._service_call_lock:
+            self._service_calls[call_id] = {"event": event, "response": None}
+
+        sent = self._send_rosbridge(
+            {
+                "op": "call_service",
+                "id": call_id,
+                "service": service,
+                "type": service_type,
+                "args": args or {},
+            }
+        )
+        if not sent:
+            with self._service_call_lock:
+                self._service_calls.pop(call_id, None)
+            raise TimeoutError("rosbridge is not connected")
+
+        if not event.wait(timeout_seconds):
+            with self._service_call_lock:
+                self._service_calls.pop(call_id, None)
+            raise TimeoutError(f"rosbridge service timeout: {service}")
+
+        with self._service_call_lock:
+            pending = self._service_calls.pop(call_id, None)
+        response = pending["response"] if pending else None
+        if not isinstance(response, dict):
+            raise TimeoutError(f"rosbridge service response missing: {service}")
+        return response
+
+    def _send_rosbridge(self, payload: dict[str, Any]) -> bool:
         with self._websocket_lock:
             websocket = self._websocket
             connected = self._websocket_connected
 
         if websocket is None or not connected:
             logger.warning("Message rosbridge ignore car la WebSocket robot n'est pas connectee")
-            return
+            return False
 
         try:
             websocket.send(json.dumps(payload))
         except OSError as exc:
             logger.warning("Envoi rosbridge echoue: %s", exc)
+            return False
+        return True
 
 
 def parse_mqtt_command_payload(topic: str, message: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
@@ -465,6 +552,30 @@ def telemetry_payload_from_ros_message(topic: str, message: dict[str, Any]) -> t
         return ROBOT_NAV2_PATH_TOPIC, {"path_distance_m": distance, "eta_source": "NAV2_PATH"}
 
     return None
+
+
+def map_snapshot_from_ros_message(message: dict[str, Any]) -> dict[str, Any] | None:
+    info = message.get("info")
+    data = message.get("data")
+    if not isinstance(info, dict) or not isinstance(data, list):
+        return None
+
+    width = int(info["width"])
+    height = int(info["height"])
+    if width <= 0 or height <= 0 or len(data) != width * height:
+        return None
+
+    origin = info.get("origin") if isinstance(info.get("origin"), dict) else {}
+    position = origin.get("position") if isinstance(origin.get("position"), dict) else {}
+    return {
+        "width": width,
+        "height": height,
+        "resolution": finite_float(info.get("resolution"), "resolution"),
+        "origin_x": float(position.get("x", 0.0)),
+        "origin_y": float(position.get("y", 0.0)),
+        "data": [int(value) for value in data],
+        "updated_at": time.time(),
+    }
 
 
 def path_distance_from_poses(poses: list[Any]) -> float:

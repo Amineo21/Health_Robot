@@ -32,6 +32,7 @@ from app.domain.repositories.user_repository import UserRepository
 from app.infrastructure.database.session import SessionLocal, engine as database_engine
 from app.infrastructure.mqtt.client import MQTTService
 from app.infrastructure.mqtt.robot_command_publisher import MqttRobotCommandPublisher
+from app.infrastructure.robot_maps.dashboard_client import RobotDashboardClient
 from app.infrastructure.rosbridge.mqtt_rosbridge_bridge import MqttRosbridgeBridge
 from app.infrastructure.repositories.in_memory_settings_repository import InMemorySettingsRepository
 from app.infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
@@ -136,6 +137,7 @@ def create_app() -> FastAPI:
     settings_repository = create_settings_repository(create_default_robot_settings())
     mqtt_service = MQTTService(settings=settings)
     robot_rosbridge_bridge = MqttRosbridgeBridge(settings=settings)
+    robot_dashboard_client = RobotDashboardClient(settings.robot_dashboard_url)
     robot_command_publisher = MqttRobotCommandPublisher(mqtt_service)
     process_navigation_eta = ProcessNavigationEtaUseCase(
         state_repository=robot_state_repository,
@@ -201,6 +203,7 @@ def create_app() -> FastAPI:
         app.state.database_engine = database_engine
         app.state.mqtt_service = mqtt_service
         app.state.robot_rosbridge_bridge = robot_rosbridge_bridge
+        app.state.robot_dashboard_client = robot_dashboard_client
         app.state.token_service = token_service
         app.state.use_cases = use_cases
         mqtt_service.start()

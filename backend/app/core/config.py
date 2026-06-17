@@ -35,6 +35,8 @@ class Settings:
     robot_rosbridge_enabled: bool = _as_bool(os.getenv("ROBOT_ROSBRIDGE_ENABLED"), False)
     robot_rosbridge_url: str = os.getenv("ROBOT_ROSBRIDGE_URL", "ws://10.10.220.180:9090")
     robot_rosbridge_client_id: str = os.getenv("ROBOT_ROSBRIDGE_CLIENT_ID", "health-robot-rosbridge")
+    robot_dashboard_url: str = os.getenv("ROBOT_DASHBOARD_URL", "http://10.10.220.180:8080")
+    robot_maps_directory: str = os.getenv("ROBOT_MAPS_DIRECTORY", "/root/maps")
     robot_base_x: float = float(os.getenv("ROBOT_BASE_X", "0.0"))
     robot_base_y: float = float(os.getenv("ROBOT_BASE_Y", "0.0"))
     robot_base_yaw: float = float(os.getenv("ROBOT_BASE_YAW", "0.0"))
