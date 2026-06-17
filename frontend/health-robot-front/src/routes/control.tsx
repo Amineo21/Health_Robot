@@ -416,7 +416,7 @@ function RobotMapView({
       </div>
       <div className="grid gap-2 text-xs text-slate-400 sm:grid-cols-2">
         <p><Crosshair className="mr-1 inline h-3.5 w-3.5 text-cyan-200" /> Clic ou clic droit = placer un pin, comme le dashboard M3 Pro.</p>
-        <p>Dimensions reelles: {widthMeters.toFixed(2)}m x {heightMeters.toFixed(2)}m. Envoi final via backend, pas rosbridge.</p>
+        <p>Dimensions reelles: {widthMeters.toFixed(2)}m x {heightMeters.toFixed(2)}m. Envoi final via backend securise.</p>
       </div>
     </div>
   )

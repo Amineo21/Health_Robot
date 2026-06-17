@@ -40,6 +40,11 @@ services:
       - MQTT_ENABLED=true
       - MQTT_HOST=mosquitto
       - MQTT_PORT=1883
+      - ROBOT_ROSBRIDGE_ENABLED=${ROBOT_ROSBRIDGE_ENABLED:-true}
+      - ROBOT_ROSBRIDGE_URL=${ROBOT_ROSBRIDGE_URL:-ws://10.10.220.180:9090}
+      - ROBOT_BASE_X=${ROBOT_BASE_X:-0.0}
+      - ROBOT_BASE_Y=${ROBOT_BASE_Y:-0.0}
+      - ROBOT_BASE_YAW=${ROBOT_BASE_YAW:-0.0}
       - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       - DATABASE_URL=mysql+pymysql://${MYSQL_USER:-health_robot}:${MYSQL_PASSWORD:-health_robot}@mysql:3306/${MYSQL_DATABASE:-health_robot}?charset=utf8mb4
       - USER_REPOSITORY_BACKEND=database

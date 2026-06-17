@@ -51,11 +51,10 @@ class MQTTService:
         try:
             self._client.disconnect()
         except OSError:
-            logger.debug("Deconnexion MQTT ignoree car le client etait deja hors ligne")
+            pass
 
     def publish_json(self, topic: str, payload: dict[str, Any], qos: int = 1, retain: bool = False) -> None:
         if not self._settings.mqtt_enabled:
-            logger.debug("Publication MQTT ignoree car MQTT_ENABLED=false sur le topic %s", topic)
             return
 
         result = self._client.publish(topic, json.dumps(payload), qos=qos, retain=retain)
