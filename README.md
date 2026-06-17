@@ -86,57 +86,147 @@ backend/
 ## Lancer le projet
 
 ### Prérequis
-- Docker & Docker Compose
 
-### 1. Variables d'environnement
+- Docker & Docker Compose v2
+- Git
+
+### 1. Cloner le repo
+
+```bash
+git clone git@github.com:Amineo21/Health_Robot.git
+cd Health_Robot
+```
+
+### 2. Créer le fichier d'environnement
 
 ```bash
 cp infra/.env.example infra/.env
 ```
 
-Éditer `infra/.env` si nécessaire (les valeurs par défaut suffisent pour le développement).
-
-### 2. Lancer tout le stack
+Éditer `infra/.env` et **remplir les valeurs obligatoires** :
 
 ```bash
-docker compose -f infra/docker-compose.yml up --build
+# Sécurité — REQUIS (le serveur ne démarre pas sans ces variables)
+JWT_SECRET_KEY=<un-secret-long-au-moins-32-caracteres>
+INITIAL_ADMIN_PASSWORD=<un-mot-de-passe-fort>
+
+# MySQL
+MYSQL_ROOT_PASSWORD=<un-mot-de-passe-fort>
+MYSQL_PASSWORD=<un-mot-de-passe-fort>
+
+# Optionnel — override si besoin
+INITIAL_ADMIN_EMAIL=admin@health-robot.local
+INITIAL_ADMIN_NAME=Admin
 ```
 
-Services exposés :
-| Service    | URL                          |
-|------------|------------------------------|
-| Frontend   | `http://localhost:3000`      |
-| Backend    | `http://localhost:4000`      |
-| API Docs   | `http://localhost:4000/docs` |
-| MQTT (tcp) | `localhost:1883`             |
+> **Générer un secret rapide :**
+> ```bash
+> openssl rand -base64 48
+> ```
+
+### 3. Lancer tout le stack
+
+```bash
+docker compose -f infra/docker-compose.yml up --build -d
+```
+
+### 4. Vérifier que tout tourne
+
+```bash
+docker compose -f infra/docker-compose.yml ps
+curl http://localhost:4000/health
+```
+
+Résultat attendu :
+
+| Service    | URL / Port                  | Vérification                       |
+|------------|-----------------------------|------------------------------------|
+| Frontend   | `http://localhost:3000`     | Page de login s'affiche            |
+| Backend    | `http://localhost:4000`     | `{"status":"healthy"}`             |
+| API Docs   | `http://localhost:4000/docs`| Swagger UI s'affiche               |
+| MQTT       | `localhost:1883`            | Broker actif                       |
+| MySQL      | `localhost:3306`            | Healthcheck OK dans docker ps      |
+
+### 5. Se connecter pour la première fois
+
+- **URL** : `http://localhost:3000`
+- **Email** : `admin@health-robot.local` (ou la valeur de `INITIAL_ADMIN_EMAIL`)
+- **Mot de passe** : la valeur de `INITIAL_ADMIN_PASSWORD`
+
+### 6. Créer des comptes caregivers
+
+Depuis l'interface admin (`/admin/users`) ou l'API :
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:4000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@health-robot.local","password":"<votre-mot-de-passe>"}' \
+  | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+
+curl -X POST http://localhost:4000/api/admin/users \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"caregiver@health-robot.local","name":"Infirmier","password":"CaregiverPass123!","role":"caregiver"}'
+```
+
+---
 
 ### Lancer le backend en local (sans Docker)
 
 ```bash
 cd backend
 pip install -r requirements.txt
-# Démarrer MySQL et Mosquitto séparément, ou via Docker :
+
+# MySQL + Mosquitto via Docker :
 docker compose -f ../infra/docker-compose.yml up -d mysql mosquitto
-# Appliquer les migrations :
+
+# Variables d'environnement (minimal) :
+export JWT_SECRET_KEY=$(openssl rand -base64 48)
+export INITIAL_ADMIN_PASSWORD=dev-password
+export DATABASE_URL=mysql+pymysql://health_robot:health_robot@localhost:3306/health_robot?charset=utf8mb4
+export USER_REPOSITORY_BACKEND=database
+
+# Migrations :
 alembic upgrade head
-# Lancer le serveur :
+
+# Lancer :
 uvicorn app.main:app --reload --port 4000
 ```
 
-### Tester l'auth admin
+### Lancer le frontend en local (sans Docker)
 
 ```bash
-curl -X POST http://localhost:4000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@health-robot.local","password":"admin"}'
+cd frontend/health-robot-front
+npm ci
+echo "VITE_API_BASE_URL=http://localhost:4000" > .env
+npm run dev
 ```
+
+Le frontend démarre sur `http://localhost:3000`.
 
 ### Tests unitaires
 
 ```bash
+# Backend
 cd backend
 pytest tests/ -v
+
+# Frontend
+cd frontend/health-robot-front
+npm test
 ```
+
+---
+
+### Dépannage
+
+| Problème | Solution |
+|----------|----------|
+| `RuntimeError: Environment variable JWT_SECRET_KEY is required` | Ajouter `JWT_SECRET_KEY=<secret>` dans `infra/.env` |
+| `RuntimeError: Environment variable INITIAL_ADMIN_PASSWORD is required` | Ajouter `INITIAL_ADMIN_PASSWORD=<mot-de-passe>` dans `infra/.env` |
+| Backend ne démarre pas, logs `Access denied for user` | Vérifier que `MYSQL_USER` / `MYSQL_PASSWORD` / `MYSQL_ROOT_PASSWORD` sont cohérents dans `.env` |
+| Frontend affiche "Erreur réseau" | Vérifier que le backend tourne : `curl http://localhost:4000/health` |
+| MQTT ne connecte pas | Vérifier `docker compose logs mosquitto` — le broker doit écouter sur 1883 |
 
 ---
 
