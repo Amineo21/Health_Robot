@@ -147,6 +147,41 @@ Résultat attendu :
 | MQTT       | `localhost:1883`            | Broker actif                       |
 | MySQL      | `localhost:3306`            | Healthcheck OK dans docker ps      |
 
+> **Important — connexion au robot réel**
+>
+> Par défaut, le backend essaie de se connecter au robot M3 Pro réel via `ROBOT_ROSBRIDGE_URL=ws://10.10.220.180:9090` et `ROBOT_DASHBOARD_URL=http://10.10.220.180:8080`.
+>
+> Si la machine n'est pas sur le même réseau que le robot, si l'IP du robot est différente, ou si `rosbridge_websocket` n'est pas lancé sur le robot, les logs peuvent afficher en boucle :
+>
+> ```text
+> WARNING:app.infrastructure.rosbridge.mqtt_rosbridge_bridge:Erreur rosbridge: [Errno 111] Connection refused
+> ERROR:websocket:[Errno 111] Connection refused - goodbye
+> WARNING:app.infrastructure.rosbridge.mqtt_rosbridge_bridge:Connexion rosbridge perdue, nouvelle tentative dans 3s
+> ```
+>
+> Ce warning ne signifie pas que le backend, le frontend, Docker ou MQTT sont cassés. Il indique seulement que le backend ne peut pas ouvrir la WebSocket ROS du robot sur `10.10.220.180:9090` depuis cette machine.
+>
+> Pour vérifier l'accès au robot depuis une autre machine :
+>
+> ```bash
+> nc -vz 10.10.220.180 9090
+> curl http://10.10.220.180:8080
+> ```
+>
+> Si vous lancez le projet sans robot réel, désactivez simplement le pont rosbridge dans `infra/.env` :
+>
+> ```bash
+> ROBOT_ROSBRIDGE_ENABLED=false
+> ```
+>
+> Si le robot a une autre adresse IP, gardez le pont activé mais remplacez les URLs :
+>
+> ```bash
+> ROBOT_ROSBRIDGE_ENABLED=true
+> ROBOT_ROSBRIDGE_URL=ws://<ip-du-robot>:9090
+> ROBOT_DASHBOARD_URL=http://<ip-du-robot>:8080
+> ```
+
 ### 5. Se connecter pour la première fois
 
 - **URL** : `http://localhost:3000`
@@ -227,6 +262,7 @@ npm test
 | Backend ne démarre pas, logs `Access denied for user` | Vérifier que `MYSQL_USER` / `MYSQL_PASSWORD` / `MYSQL_ROOT_PASSWORD` sont cohérents dans `.env` |
 | Frontend affiche "Erreur réseau" | Vérifier que le backend tourne : `curl http://localhost:4000/health` |
 | MQTT ne connecte pas | Vérifier `docker compose logs mosquitto` — le broker doit écouter sur 1883 |
+| Logs répétés `Erreur rosbridge: [Errno 111] Connection refused` | La machine ne peut pas joindre le robot sur `ROBOT_ROSBRIDGE_URL`. Vérifier le réseau/IP/port `9090`, ou mettre `ROBOT_ROSBRIDGE_ENABLED=false` si aucun robot réel n'est utilisé |
 
 ---
 
