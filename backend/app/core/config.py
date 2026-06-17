@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 
@@ -15,6 +15,16 @@ def _as_csv(value: Optional[str], default: tuple[str, ...]) -> tuple[str, ...]:
     if value is None:
         return default
     return tuple(item.strip() for item in value.split(",") if item.strip())
+
+
+def _require_env(key: str) -> str:
+    value = os.getenv(key)
+    if not value:
+        raise RuntimeError(
+            f"Environment variable {key} is required. "
+            "Set it in your .env file or environment before starting the server."
+        )
+    return value
 
 
 @dataclass(frozen=True)
@@ -48,11 +58,11 @@ class Settings:
     auto_return_enabled: bool = _as_bool(os.getenv("AUTO_RETURN_ENABLED"), True)
     teleop_enabled: bool = _as_bool(os.getenv("TELEOP_ENABLED"), True)
     emergency_requires_admin_reset: bool = _as_bool(os.getenv("EMERGENCY_REQUIRES_ADMIN_RESET"), True)
-    jwt_secret_key: str = os.getenv("JWT_SECRET_KEY", "dev-secret-change-me")
+    jwt_secret_key: str = field(default_factory=lambda: _require_env("JWT_SECRET_KEY"))
     jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
     access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"))
     initial_admin_email: str = os.getenv("INITIAL_ADMIN_EMAIL", os.getenv("ADMIN_EMAIL", "admin@health-robot.local"))
-    initial_admin_password: str = os.getenv("INITIAL_ADMIN_PASSWORD", os.getenv("ADMIN_PASSWORD", "admin"))
+    initial_admin_password: str = field(default_factory=lambda: _require_env("INITIAL_ADMIN_PASSWORD"))
     initial_admin_name: str = os.getenv("INITIAL_ADMIN_NAME", "Admin")
     robot_api_key: Optional[str] = os.getenv("ROBOT_API_KEY")
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///./health_robot.db")

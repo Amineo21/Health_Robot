@@ -1,4 +1,4 @@
-import { apiFetch } from './api'
+import { API_BASE_URL, ApiError, apiFetch, getAccessToken } from './api'
 import type { UserRole } from './auth'
 
 export interface BatteryEvent {
@@ -89,6 +89,26 @@ export interface SaveRobotMapResponse {
   pose_graph?: Record<string, unknown> | null
 }
 
+export interface RobotSound {
+  name: string
+  size: number
+  modified: number
+}
+
+export interface RobotSoundsResponse {
+  sounds: RobotSound[]
+}
+
+export interface RobotSoundOperationResponse {
+  ok: boolean
+  name?: string | null
+  size?: number | null
+}
+
+export interface RobotArmState {
+  joints: number[]
+}
+
 export interface NavigatePayload {
   x: number
   y: number
@@ -110,6 +130,48 @@ export interface RobotCommandResponse {
   payload: Record<string, unknown>
   timestamp: string
   status: string
+}
+
+function resolveApiUrl(path: string) {
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path
+  }
+
+  return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`
+}
+
+function getRawErrorMessage(data: unknown, fallback: string) {
+  if (typeof data === 'string' && data.length > 0) {
+    return data
+  }
+
+  if (data && typeof data === 'object' && 'detail' in data && typeof data.detail === 'string') {
+    return data.detail
+  }
+
+  return fallback
+}
+
+async function rawApiFetch(path: string, options: RequestInit = {}) {
+  const headers = new Headers(options.headers)
+  const token = getAccessToken()
+
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+
+  const response = await fetch(resolveApiUrl(path), {
+    ...options,
+    headers,
+  })
+
+  if (!response.ok) {
+    const contentType = response.headers.get('content-type') ?? ''
+    const data = contentType.includes('application/json') ? await response.json().catch(() => undefined) : await response.text()
+    throw new ApiError(getRawErrorMessage(data, response.statusText || 'Erreur API'), response.status, data)
+  }
+
+  return response
 }
 
 export function fetchRobotStatus() {
@@ -189,5 +251,55 @@ export function loadSavedRobotMap(name: string) {
 export function deleteSavedRobotMap(name: string) {
   return apiFetch<RobotMapOperationResponse>(`/api/robot/maps/${encodeURIComponent(name)}`, {
     method: 'DELETE',
+  })
+}
+
+export async function fetchRobotCameraSnapshot() {
+  const response = await rawApiFetch('/api/robot/camera/snapshot', {
+    headers: { Accept: 'image/jpeg' },
+  })
+  return response.blob()
+}
+
+export function fetchRobotSounds() {
+  return apiFetch<RobotSoundsResponse>('/api/robot/sounds')
+}
+
+export function uploadRobotSound(name: string, data: Blob | ArrayBuffer) {
+  return apiFetch<RobotSoundOperationResponse>(`/api/robot/sounds/upload?name=${encodeURIComponent(name)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: data,
+  })
+}
+
+export function playRobotSound(name: string) {
+  return apiFetch<RobotSoundOperationResponse>(`/api/robot/sounds/${encodeURIComponent(name)}/play`, {
+    method: 'POST',
+  })
+}
+
+export function deleteRobotSound(name: string) {
+  return apiFetch<RobotSoundOperationResponse>(`/api/robot/sounds/${encodeURIComponent(name)}`, {
+    method: 'DELETE',
+  })
+}
+
+export function fetchRobotArmState() {
+  return apiFetch<RobotArmState>('/api/robot/arm')
+}
+
+export function commandRobotArm(joints: number[], timeMs = 800) {
+  return apiFetch<RobotArmState>('/api/robot/arm', {
+    method: 'POST',
+    body: JSON.stringify({
+      joint1: joints[0],
+      joint2: joints[1],
+      joint3: joints[2],
+      joint4: joints[3],
+      joint5: joints[4],
+      joint6: joints[5],
+      time_ms: timeMs,
+    }),
   })
 }

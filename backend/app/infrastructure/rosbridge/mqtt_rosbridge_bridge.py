@@ -35,6 +35,7 @@ COMMAND_SUBSCRIPTIONS: tuple[tuple[str, int], ...] = (
 ROSBRIDGE_ADVERTISE_TOPICS: tuple[tuple[str, str], ...] = (
     ("/goal_pose", "geometry_msgs/msg/PoseStamped"),
     ("/cmd_vel", "geometry_msgs/msg/Twist"),
+    ("/arm6_joints", "arm_msgs/msg/ArmJoints"),
 )
 
 ROSBRIDGE_SUBSCRIBE_TOPICS: tuple[tuple[str, str, int], ...] = (
@@ -45,7 +46,18 @@ ROSBRIDGE_SUBSCRIBE_TOPICS: tuple[tuple[str, str, int], ...] = (
     ("/amcl_pose", "geometry_msgs/msg/PoseWithCovarianceStamped", 200),
     ("/odom", "nav_msgs/msg/Odometry", 500),
     ("/plan", "nav_msgs/msg/Path", 1000),
+    ("/joint_states", "sensor_msgs/msg/JointState", 500),
 )
+
+JOINT_STATE_NAME_TO_INDEX = {
+    "base_yaw_joint": 0,
+    "shoulder_joint": 1,
+    "elbow_joint": 2,
+    "wrist_pitch_joint": 3,
+    "wrist_roll_joint": 4,
+    "left_finger_joint": 5,
+    "right_finger_joint": 5,
+}
 
 
 class MqttRosbridgeBridge:
@@ -71,6 +83,8 @@ class MqttRosbridgeBridge:
         self._service_calls: dict[str, dict[str, Any]] = {}
         self._latest_map_lock = threading.Lock()
         self._latest_map_snapshot: dict[str, Any] | None = None
+        self._latest_arm_lock = threading.Lock()
+        self._latest_arm_joints = [90, 90, 90, 90, 90, 90]
         self._zero_twist_timers: list[threading.Timer] = []
         self._emergency_active = False
 
@@ -230,6 +244,11 @@ class MqttRosbridgeBridge:
             if snapshot is not None:
                 with self._latest_map_lock:
                     self._latest_map_snapshot = snapshot
+        elif topic == "/joint_states":
+            arm_joints = arm_state_from_joint_states(ros_message)
+            if arm_joints is not None:
+                with self._latest_arm_lock:
+                    self._latest_arm_joints = arm_joints
 
         try:
             telemetry = telemetry_payload_from_ros_message(topic, ros_message)
@@ -388,6 +407,32 @@ class MqttRosbridgeBridge:
     def get_latest_map_snapshot(self) -> dict[str, Any] | None:
         with self._latest_map_lock:
             return deepcopy(self._latest_map_snapshot)
+
+    def get_latest_arm_state(self) -> dict[str, list[int]]:
+        with self._latest_arm_lock:
+            return {"joints": list(self._latest_arm_joints)}
+
+    def publish_arm_joints(self, joints: list[int], time_ms: int) -> None:
+        if len(joints) != 6:
+            raise ValueError("six arm joints are required")
+        bounded = [max(0, min(180, int(value))) for value in joints]
+        self._send_rosbridge(
+            {
+                "op": "publish",
+                "topic": "/arm6_joints",
+                "msg": {
+                    "joint1": bounded[0],
+                    "joint2": bounded[1],
+                    "joint3": bounded[2],
+                    "joint4": bounded[3],
+                    "joint5": bounded[4],
+                    "joint6": bounded[5],
+                    "time": int(time_ms),
+                },
+            }
+        )
+        with self._latest_arm_lock:
+            self._latest_arm_joints = bounded
 
     def save_map(self, base_path: str) -> dict[str, Any]:
         occupancy = self.call_service(
@@ -576,6 +621,25 @@ def map_snapshot_from_ros_message(message: dict[str, Any]) -> dict[str, Any] | N
         "data": [int(value) for value in data],
         "updated_at": time.time(),
     }
+
+
+def arm_state_from_joint_states(message: dict[str, Any]) -> list[int] | None:
+    names = message.get("name")
+    positions = message.get("position")
+    if not isinstance(names, list) or not isinstance(positions, list):
+        return None
+
+    joints = [90, 90, 90, 90, 90, 90]
+    found = False
+    for name, position in zip(names, positions, strict=False):
+        if not isinstance(name, str) or not isinstance(position, int | float):
+            continue
+        index = JOINT_STATE_NAME_TO_INDEX.get(name)
+        if index is None:
+            continue
+        joints[index] = max(0, min(180, round(90 + float(position) * 180 / math.pi)))
+        found = True
+    return joints if found else None
 
 
 def path_distance_from_poses(poses: list[Any]) -> float:

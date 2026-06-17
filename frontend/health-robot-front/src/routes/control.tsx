@@ -1,17 +1,24 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { AlertTriangle, Battery, Bot, Crosshair, Gauge, Loader2, MapPinned, OctagonX, RotateCcw, Send, ShieldAlert, Video, Wifi } from 'lucide-react'
+import { AlertTriangle, Battery, Camera, Crosshair, Gauge, Loader2, MapPinned, Music2, OctagonX, Play, RefreshCw, RotateCcw, Send, ShieldAlert, SlidersHorizontal, Trash2, Upload, Video, Wifi } from 'lucide-react'
 
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { RobotJoystick } from '@/components/robot-joystick'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatMapCoordinate, mapCoordinatesToPercent, mapMetadataToBounds, screenPointToMapCoordinates, type ControlMapBounds } from '@/lib/control-map'
-import { clearCostmaps, navigateToPosition, resetEmergency, returnBase, sendTeleop, triggerEmergencyStop, type RobotMapMetadata, type RobotPose } from '@/lib/robot-api'
+import { clearCostmaps, commandRobotArm, deleteRobotSound, fetchRobotArmState, fetchRobotCameraSnapshot, fetchRobotSounds, navigateToPosition, playRobotSound, resetEmergency, returnBase, sendTeleop, triggerEmergencyStop, uploadRobotSound, type RobotMapMetadata, type RobotPose, type RobotSound } from '@/lib/robot-api'
 import { useRobot } from '@/lib/robot-context'
 import { canUseAdminControls, CAREGIVER_OR_ADMIN_ROLES } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/control')({ component: ControlRoute })
+
+const DEFAULT_ARM_JOINTS = [90, 90, 90, 90, 90, 90]
+const ARM_PRESETS = [
+  { name: 'Center', joints: [90, 90, 90, 90, 90, 90] },
+  { name: 'Camera forward', joints: [90, 60, 45, 90, 90, 90] },
+  { name: 'Camera up', joints: [90, 30, 60, 90, 90, 90] },
+]
 
 function ControlRoute() {
   return (
@@ -227,18 +234,11 @@ function ControlPage() {
             </article>
           )}
 
-          <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <h2 className="flex items-center gap-2 text-lg font-semibold">
-              <Video className="h-5 w-5" /> Camera Feed
-            </h2>
-            <div className="mt-4 flex aspect-video items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-slate-950/40">
-              <div className="text-center text-slate-400">
-                <Bot className="mx-auto mb-3 h-16 w-16 text-slate-500/60" />
-                <p>Flux vidéo non branché pour le MVP</p>
-                <p className="mt-1 text-xs text-slate-500">Le frontend ne se connecte pas directement au robot.</p>
-              </div>
-            </div>
-          </article>
+          <CameraFeed />
+
+          <RobotArmPanel isAdmin={isAdmin} />
+
+          <RobotSoundsPanel isAdmin={isAdmin} />
         </section>
 
         <aside className="space-y-4">
@@ -285,6 +285,378 @@ function ControlPage() {
         </aside>
       </div>
     </div>
+  )
+}
+
+function CameraFeed() {
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const loadSnapshot = async () => {
+    setError('')
+    setIsLoading(true)
+    try {
+      const blob = await fetchRobotCameraSnapshot()
+      setImageUrl(URL.createObjectURL(blob))
+    } catch (cameraError) {
+      setError(cameraError instanceof Error ? cameraError.message : 'Camera robot indisponible')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadSnapshot()
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (imageUrl) {
+        URL.revokeObjectURL(imageUrl)
+      }
+    }
+  }, [imageUrl])
+
+  return (
+    <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            <Video className="h-5 w-5" /> Camera Feed
+          </h2>
+          <p className="mt-2 text-sm text-slate-400">JPEG proxifie via GET /api/robot/camera/snapshot avec JWT backend.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void loadSnapshot()}
+          disabled={isLoading}
+          className="inline-flex items-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+          Refresh
+        </button>
+      </div>
+
+      {error && <div className="mt-4 rounded-2xl border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-100">{error}</div>}
+
+      <div className="relative mt-4 flex aspect-video items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-slate-950/70">
+        {imageUrl ? (
+          <img src={imageUrl} alt="Flux camera robot" className="h-full w-full object-contain" />
+        ) : (
+          <div className="text-center text-slate-400">
+            <Camera className="mx-auto mb-3 h-16 w-16 text-slate-500/60" />
+            <p>{isLoading ? 'Chargement camera...' : 'Snapshot camera en attente'}</p>
+            <p className="mt-1 text-xs text-slate-500">Le frontend ne se connecte pas directement au robot.</p>
+          </div>
+        )}
+
+        {isLoading && imageUrl && (
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-950/45 text-sm text-cyan-100 backdrop-blur-sm">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Mise a jour camera
+          </div>
+        )}
+      </div>
+    </article>
+  )
+}
+
+function RobotArmPanel({ isAdmin }: { isAdmin: boolean }) {
+  const [joints, setJoints] = useState(DEFAULT_ARM_JOINTS)
+  const [timeMs, setTimeMs] = useState('800')
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSending, setIsSending] = useState(false)
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+
+  const loadArmState = async () => {
+    setError('')
+    setIsLoading(true)
+    try {
+      const state = await fetchRobotArmState()
+      setJoints(normalizeArmJoints(state.joints))
+    } catch (armError) {
+      setError(armError instanceof Error ? armError.message : 'Etat bras indisponible')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadArmState()
+  }, [])
+
+  const sendArmCommand = async () => {
+    if (!isAdmin) {
+      return
+    }
+
+    const duration = Math.round(Number(timeMs))
+    if (!Number.isFinite(duration) || duration < 100 || duration > 5000) {
+      setError('time_ms doit etre compris entre 100 et 5000.')
+      return
+    }
+
+    setError('')
+    setMessage('')
+    setIsSending(true)
+    try {
+      const state = await commandRobotArm(joints, duration)
+      setJoints(normalizeArmJoints(state.joints))
+      setMessage('Commande bras envoyee')
+    } catch (armError) {
+      setError(armError instanceof Error ? armError.message : 'Commande bras refusee')
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  return (
+    <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            <SlidersHorizontal className="h-5 w-5" /> Bras robot
+          </h2>
+          <p className="mt-2 text-sm text-slate-400">Lecture pour admin/caregiver, commande reservee admin via POST /api/robot/arm.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void loadArmState()}
+          disabled={isLoading}
+          className="inline-flex items-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+          Etat
+        </button>
+      </div>
+
+      {(message || error) && (
+        <div className={cn('mt-4 rounded-2xl border p-3 text-sm', message && 'border-emerald-400/30 bg-emerald-400/10 text-emerald-100', error && 'border-rose-400/30 bg-rose-400/10 text-rose-100')}>
+          {message || error}
+        </div>
+      )}
+
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        {joints.map((joint, index) => (
+          <label key={index} className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 text-sm">
+            <span className="flex items-center justify-between gap-3 text-slate-300">
+              <span>Joint {index + 1}</span>
+              <span className="font-mono text-white">{joint} deg</span>
+            </span>
+            <input
+              type="range"
+              min="0"
+              max="180"
+              value={joint}
+              disabled={!isAdmin || isSending}
+              onChange={(event) => setJoints((previous) => previous.map((value, jointIndex) => (jointIndex === index ? Number(event.target.value) : value)))}
+              className="mt-3 w-full accent-cyan-300 disabled:opacity-50"
+            />
+          </label>
+        ))}
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-end gap-3">
+        {ARM_PRESETS.map((preset) => (
+          <button
+            key={preset.name}
+            type="button"
+            disabled={!isAdmin || isSending}
+            onClick={() => setJoints([...preset.joints])}
+            className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-50 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {preset.name}
+          </button>
+        ))}
+
+        <label className="space-y-2 text-sm">
+          <span className="text-slate-300">time_ms</span>
+          <input
+            type="number"
+            min="100"
+            max="5000"
+            step="100"
+            value={timeMs}
+            disabled={!isAdmin || isSending}
+            onChange={(event) => setTimeMs(event.target.value)}
+            className="w-28 rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-2 text-white disabled:opacity-50"
+          />
+        </label>
+
+        <button
+          type="button"
+          disabled={!isAdmin || isSending}
+          onClick={() => void sendArmCommand()}
+          className="inline-flex items-center rounded-2xl bg-cyan-400 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+          Envoyer bras
+        </button>
+      </div>
+
+      {!isAdmin && <p className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3 text-sm text-amber-100">Les commandes bras et presets sont réservés aux administrateurs.</p>}
+    </article>
+  )
+}
+
+function RobotSoundsPanel({ isAdmin }: { isAdmin: boolean }) {
+  const [sounds, setSounds] = useState<RobotSound[]>([])
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [uploadName, setUploadName] = useState('')
+  const [fileInputKey, setFileInputKey] = useState(0)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+
+  const loadSounds = async () => {
+    setError('')
+    setIsLoading(true)
+    try {
+      const response = await fetchRobotSounds()
+      setSounds(response.sounds)
+    } catch (soundError) {
+      setError(soundError instanceof Error ? soundError.message : 'Sons robot indisponibles')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadSounds()
+  }, [])
+
+  const runSoundAction = async (action: () => Promise<unknown>, successMessage: string, refreshAfter = true) => {
+    setError('')
+    setMessage('')
+    setIsSubmitting(true)
+    try {
+      await action()
+      if (refreshAfter) {
+        await loadSounds()
+      }
+      setMessage(successMessage)
+    } catch (soundError) {
+      setError(soundError instanceof Error ? soundError.message : 'Operation audio refusee')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleUpload = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!isAdmin) {
+      return
+    }
+    if (!selectedFile) {
+      setError('Choisis un fichier audio a uploader.')
+      return
+    }
+
+    const name = uploadName.trim() || selectedFile.name
+    await runSoundAction(() => uploadRobotSound(name, selectedFile), `Son uploade: ${name}`)
+    setSelectedFile(null)
+    setUploadName('')
+    setFileInputKey((value) => value + 1)
+  }
+
+  return (
+    <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            <Music2 className="h-5 w-5" /> Audio robot
+          </h2>
+          <p className="mt-2 text-sm text-slate-400">Liste et lecture pour admin/caregiver. Upload/delete reserves admin.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void loadSounds()}
+          disabled={isLoading}
+          className="inline-flex items-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+          Refresh
+        </button>
+      </div>
+
+      {(message || error) && (
+        <div className={cn('mt-4 rounded-2xl border p-3 text-sm', message && 'border-emerald-400/30 bg-emerald-400/10 text-emerald-100', error && 'border-rose-400/30 bg-rose-400/10 text-rose-100')}>
+          {message || error}
+        </div>
+      )}
+
+      {isAdmin && (
+        <form className="mt-5 grid gap-3 rounded-2xl border border-white/10 bg-slate-950/40 p-4 md:grid-cols-[1fr_1fr_auto]" onSubmit={handleUpload}>
+          <label className="space-y-2 text-sm">
+            <span className="text-slate-300">Fichier audio</span>
+            <input
+              key={fileInputKey}
+              type="file"
+              accept="audio/*"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0] ?? null
+                setSelectedFile(file)
+                setUploadName(file?.name ?? '')
+              }}
+              className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white file:mr-3 file:rounded-xl file:border-0 file:bg-cyan-400 file:px-3 file:py-2 file:text-sm file:font-bold file:text-slate-950"
+            />
+          </label>
+          <label className="space-y-2 text-sm">
+            <span className="text-slate-300">Nom sur le robot</span>
+            <input
+              value={uploadName}
+              onChange={(event) => setUploadName(event.target.value)}
+              placeholder="message.mp3"
+              className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={isSubmitting || !selectedFile}
+            className="inline-flex items-center justify-center self-end rounded-2xl bg-cyan-400 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+            Upload
+          </button>
+        </form>
+      )}
+
+      {!isAdmin && <p className="mt-5 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3 text-sm text-amber-100">Upload et suppression audio sont réservés aux administrateurs.</p>}
+
+      <div className="mt-5 space-y-3">
+        {sounds.length === 0 && !isLoading && <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 text-sm text-slate-400">Aucun son disponible dans /root/sounds.</div>}
+        {sounds.map((sound) => (
+          <div key={sound.name} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+            <div>
+              <p className="font-medium text-white">{sound.name}</p>
+              <p className="mt-1 font-mono text-xs text-slate-400">{formatBytes(sound.size)}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => void runSoundAction(() => playRobotSound(sound.name), `Lecture demandee: ${sound.name}`, false)}
+                className="inline-flex items-center rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-sm font-medium text-emerald-50 transition hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Play className="mr-2 h-4 w-4" /> Play
+              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => void runSoundAction(() => deleteRobotSound(sound.name), `Son supprime: ${sound.name}`)}
+                  className="inline-flex items-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-2 text-sm font-medium text-rose-50 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </article>
   )
 }
 
@@ -493,4 +865,33 @@ function buildMapTicks(min: number, max: number) {
 
 function isValidNumberInput(value: string) {
   return value.trim().length > 0 && Number.isFinite(Number(value))
+}
+
+function normalizeArmJoints(joints: number[]) {
+  return DEFAULT_ARM_JOINTS.map((fallback, index) => {
+    const value = Number(joints[index])
+    if (!Number.isFinite(value)) {
+      return fallback
+    }
+    return Math.max(0, Math.min(180, Math.round(value)))
+  })
+}
+
+function formatBytes(size: number) {
+  if (!Number.isFinite(size) || size <= 0) {
+    return '0 B'
+  }
+  if (size < 1024) {
+    return `${size} B`
+  }
+
+  const units = ['KB', 'MB', 'GB']
+  let value = size / 1024
+  let unitIndex = 0
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024
+    unitIndex += 1
+  }
+
+  return `${value >= 10 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`
 }

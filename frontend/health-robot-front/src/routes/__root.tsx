@@ -64,12 +64,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <Suspense fallback={null}>
             <Devtools
               config={{ position: 'bottom-right' }}
-              plugins={[
-                {
-                  name: 'Tanstack Router',
-                  render: <RouterDevtoolsPanel />,
-                },
-              ]}
+              plugins={RouterDevtoolsPanel ? [{ name: 'Tanstack Router', render: <RouterDevtoolsPanel /> }] : []}
             />
           </Suspense>
         )}

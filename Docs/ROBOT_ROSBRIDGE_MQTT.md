@@ -39,6 +39,18 @@ Saved maps live inside the robot Docker container under `/root/maps`. The backen
 - `POST /api/robot/maps/{name}/load` switches to navigation mode with `/root/maps/<name>.yaml`.
 - `DELETE /api/robot/maps/{name}` deletes the matching `.yaml`, `.pgm`, `.data`, and `.posegraph` files.
 
+## Camera, Audio, And Arm
+
+Robot media stays behind the backend instead of exposing robot services to the browser:
+
+- `GET /api/robot/camera/snapshot` proxies the robot dashboard JPEG snapshot from `ROBOT_DASHBOARD_URL`.
+- `GET /api/robot/sounds` lists files from the robot dashboard sound directory (`/root/sounds`).
+- `POST /api/robot/sounds/{name}/play` asks the robot dashboard to play a sound. Admin and caregiver are allowed.
+- `POST /api/robot/sounds/upload?name=<file>` uploads raw `application/octet-stream` audio. Admin only.
+- `DELETE /api/robot/sounds/{name}` deletes a sound through the robot dashboard. Admin only.
+- `GET /api/robot/arm` returns the latest `/joint_states` arm snapshot converted to servo degrees.
+- `POST /api/robot/arm` publishes `arm_msgs/msg/ArmJoints` on `/arm6_joints`. Admin only.
+
 ## Safety Boundary
 
 The frontend must not connect directly to rosbridge. Human users still go through backend JWT/RBAC checks, then commands are published to MQTT and forwarded by the backend adapter.

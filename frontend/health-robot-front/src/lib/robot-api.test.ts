@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { setAccessToken } from './api'
-import { fetchCurrentRobotMap, navigateToPosition, saveCurrentRobotMap, sendTeleop } from './robot-api'
+import { commandRobotArm, fetchCurrentRobotMap, fetchRobotCameraSnapshot, navigateToPosition, saveCurrentRobotMap, sendTeleop, uploadRobotSound } from './robot-api'
 
 const fetchMock = vi.fn()
 
@@ -59,5 +59,43 @@ describe('robot-api', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:4000/api/robot/maps/save')
     expect(init.method).toBe('POST')
     expect(JSON.parse(init.body as string)).toEqual({ name: 'map_1' })
+  })
+
+  it('fetches camera snapshots with bearer auth', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('jpeg', { headers: { 'content-type': 'image/jpeg' } }))
+
+    const blob = await fetchRobotCameraSnapshot()
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit
+    const headers = init.headers as Headers
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:4000/api/robot/camera/snapshot')
+    expect(headers.get('Authorization')).toBe('Bearer jwt')
+    expect(headers.get('Accept')).toBe('image/jpeg')
+    expect(blob.type).toBe('image/jpeg')
+  })
+
+  it('uploads sound bytes through backend', async () => {
+    const data = new Blob(['mp3'])
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true, name: 'hello.mp3', size: 3 }))
+
+    await uploadRobotSound('hello.mp3', data)
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit
+    const headers = init.headers as Headers
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:4000/api/robot/sounds/upload?name=hello.mp3')
+    expect(init.method).toBe('POST')
+    expect(headers.get('Content-Type')).toBe('application/octet-stream')
+    expect(init.body).toBe(data)
+  })
+
+  it('posts arm commands through backend', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ joints: [90, 60, 45, 90, 90, 90] }))
+
+    await commandRobotArm([90, 60, 45, 90, 90, 90], 1200)
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:4000/api/robot/arm')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body as string)).toEqual({ joint1: 90, joint2: 60, joint3: 45, joint4: 90, joint5: 90, joint6: 90, time_ms: 1200 })
   })
 })

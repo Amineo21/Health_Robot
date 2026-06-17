@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, Request, status
@@ -90,5 +91,5 @@ CaregiverOrAdminDep = Annotated[User, Depends(require_roles(UserRole.admin, User
 def require_robot_api_key(api_key: Annotated[str | None, Header(alias="X-Robot-Api-Key")] = None) -> None:
     if settings.robot_api_key is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Robot API key is not configured")
-    if api_key != settings.robot_api_key:
+    if not hmac.compare_digest(api_key or "", settings.robot_api_key):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid robot API key")

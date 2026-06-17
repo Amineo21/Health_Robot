@@ -139,7 +139,7 @@ export function RobotProvider({ children }: { children: ReactNode }) {
   const [missions, setMissions] = useState<Mission[]>([])
   const [activityFeed, setActivityFeed] = useState<ActivityEvent[]>([])
   const [connections, setConnections] = useState<SystemConnection[]>(initialConnections)
-  const [deliveriesToday, setDeliveriesToday] = useState(0)
+  const [deliveriesToday] = useState(0)
 
   const status = mapBackendMode(backendStatus)
   const activeMission = missions.find((mission) => mission.status === 'in-progress') || null
