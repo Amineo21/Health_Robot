@@ -3,7 +3,13 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+import asyncio
+import io
+import json
+import logging
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Any
 
 from app.application.use_cases.authenticate_user import AuthenticateUserUseCase
 from app.application.use_cases.clear_emergency import ClearEmergencyUseCase
