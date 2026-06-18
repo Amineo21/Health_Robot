@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { Compass, HardDrive, Layers3, Loader2, MapPinned, Play, RefreshCw, Save, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Bot, MapPin, Navigation, MousePointer2, CheckCircle } from 'lucide-react'
 
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { RobotKeyboardTeleop } from '@/components/robot-keyboard-teleop'
@@ -31,98 +32,107 @@ function MapRoute() {
   )
 }
 
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:4000') as string
+
+interface MapMeta {
+  resolution: number
+  origin: [number, number, number]
+  width?: number
+  height?: number
+}
+
 function MapPage() {
-  const { user } = useAuth()
-  const { backendStatus, statusError, refreshStatus } = useRobot()
-  const [currentMap, setCurrentMap] = useState<RobotMapSnapshot | null>(null)
-  const [savedMaps, setSavedMaps] = useState<SavedRobotMap[]>([])
-  const [modeState, setModeState] = useState<Record<string, unknown> | null>(null)
-  const [mapName, setMapName] = useState(defaultMapName)
-  const [isLoading, setIsLoading] = useState(false)
-  const [isActionRunning, setIsActionRunning] = useState(false)
-  const [message, setMessage] = useState('')
-  const [error, setError] = useState('')
-  const isAdmin = canUseAdminControls(user)
-  const modeProgress = getModeStateText(modeState, 'progress')
-  const modeError = getModeStateText(modeState, 'error')
-  const modeLogTail = getModeStateText(modeState, 'log_tail')
-  const hasModeFailure = modeState?.ok === false || modeProgress === 'error' || Boolean(modeError)
-
-  const refreshMaps = async () => {
-    setIsLoading(true)
-    try {
-      const [mapResult, savedResult, modeResult] = await Promise.allSettled([
-        fetchCurrentRobotMap(),
-        fetchSavedRobotMaps(),
-        fetchRobotMapMode(),
-      ])
-
-      if (mapResult.status === 'fulfilled') {
-        setCurrentMap(mapResult.value)
-      } else if (!(mapResult.reason instanceof ApiError && mapResult.reason.status === 404)) {
-        throw mapResult.reason
-      }
-
-      if (savedResult.status === 'fulfilled') {
-        setSavedMaps(savedResult.value.maps)
-      } else {
-        throw savedResult.reason
-      }
-
-      if (modeResult.status === 'fulfilled') {
-        setModeState(modeResult.value.result)
-      } else {
-        throw modeResult.reason
-      }
-
-      setError('')
-    } catch (refreshError) {
-      setError(getErrorMessage(refreshError))
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const { telemetry, activeMission, status, sendGoal, lastGoal, arrivalMessage, clearArrivalMessage } = useRobot()
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [mapMeta, setMapMeta] = useState<MapMeta | null>(null)
+  const [mapAvailable, setMapAvailable] = useState(false)
+  const imgSizeRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 })
 
   useEffect(() => {
-    void refreshMaps()
-    const interval = window.setInterval(() => {
-      void refreshMaps()
-    }, 5000)
-    return () => window.clearInterval(interval)
+    fetch(`${BACKEND_URL}/api/map/metadata`)
+      .then((r) => r.json())
+      .then((data) => {
+        setMapMeta(data)
+        setMapAvailable(true)
+      })
+      .catch(() => setMapAvailable(false))
   }, [])
 
-  const runMapAction = async (action: () => Promise<unknown>, successMessage: string) => {
-    setError('')
-    setMessage('')
-    setIsActionRunning(true)
-    try {
-      await action()
-      await Promise.all([refreshMaps(), refreshStatus()])
-      setMessage(successMessage)
-    } catch (actionError) {
-      setError(getErrorMessage(actionError))
-    } finally {
-      setIsActionRunning(false)
+  useEffect(() => {
+    if (!mapAvailable || !canvasRef.current || !mapMeta) return
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const img = new Image()
+    img.src = `${BACKEND_URL}/api/map/image`
+    img.onload = () => {
+      canvas.width = img.width
+      canvas.height = img.height
+      imgSizeRef.current = { w: img.width, h: img.height }
+      ctx.drawImage(img, 0, 0)
+
+      const resolution = mapMeta.resolution
+      const originX = mapMeta.origin[0]
+      const originY = mapMeta.origin[1]
+      const pose = (telemetry as any).pose ?? { x: 0, y: 0 }
+
+      const px = Math.round((pose.x - originX) / resolution)
+      const py = img.height - Math.round((pose.y - originY) / resolution)
+
+      ctx.beginPath()
+      ctx.arc(px, py, 8, 0, 2 * Math.PI)
+      ctx.fillStyle = status === 'delivering' ? 'rgba(52,211,153,0.4)' : 'rgba(34,211,238,0.4)'
+      ctx.fill()
+      ctx.beginPath()
+      ctx.arc(px, py, 5, 0, 2 * Math.PI)
+      ctx.fillStyle = status === 'delivering' ? '#34d399' : '#22d3ee'
+      ctx.fill()
+
+      // Trajet Nav2
+      const navPath = (telemetry as any).navPath as { x: number; y: number }[] | undefined
+      if (navPath && navPath.length > 1) {
+        ctx.beginPath()
+        ctx.strokeStyle = 'rgba(34,211,238,0.6)'
+        ctx.lineWidth = 2
+        ctx.setLineDash([4, 4])
+        navPath.forEach((p, i) => {
+          const nx = Math.round((p.x - originX) / resolution)
+          const ny = img.height - Math.round((p.y - originY) / resolution)
+          if (i === 0) ctx.moveTo(nx, ny)
+          else ctx.lineTo(nx, ny)
+        })
+        ctx.stroke()
+        ctx.setLineDash([])
+      }
+
+      if (lastGoal) {
+        const gx = Math.round((lastGoal.x - originX) / resolution)
+        const gy = img.height - Math.round((lastGoal.y - originY) / resolution)
+        ctx.beginPath()
+        ctx.arc(gx, gy, 6, 0, 2 * Math.PI)
+        ctx.fillStyle = 'rgba(251,191,36,0.4)'
+        ctx.fill()
+        ctx.beginPath()
+        ctx.arc(gx, gy, 3, 0, 2 * Math.PI)
+        ctx.fillStyle = '#fbbf24'
+        ctx.fill()
+      }
     }
-  }
+  }, [mapAvailable, mapMeta, telemetry, status, lastGoal])
 
-  const handleStartMapping = () => {
-    if (!window.confirm('Démarrer le mode de cartographie sur le robot ? Cela peut relancer la pile ROS active.')) return
-    void runMapAction(startMappingMode, 'Mode cartographie demandé au robot')
-  }
-
-  const handleSaveMap = () => {
-    void runMapAction(() => saveCurrentRobotMap(mapName), `Carte sauvegardée dans /root/maps/${sanitizeMapName(mapName)}`)
-  }
-
-  const handleLoadMap = (name: string) => {
-    if (!window.confirm(`Charger la carte "é${name}" en navigation ? Cela arrête la cartographie manuelle et démarre Nav2.`)) return
-    void runMapAction(() => loadSavedRobotMap(name), `Chargement de la carte ${name} demandé`)
-  }
-
-  const handleDeleteMap = (name: string) => {
-    if (!window.confirm(`Supprimer la carte "é${name}" depuis /root/maps ?`)) return
-    void runMapAction(() => deleteSavedRobotMap(name), `Carte ${name} supprimée`)
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!mapMeta || !canvasRef.current) return
+    const canvas = canvasRef.current
+    const rect = canvas.getBoundingClientRect()
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
+    const pixelX = (e.clientX - rect.left) * scaleX
+    const pixelY = (e.clientY - rect.top) * scaleY
+    const worldX = pixelX * mapMeta.resolution + mapMeta.origin[0]
+    const worldY = (canvas.height - pixelY) * mapMeta.resolution + mapMeta.origin[1]
+    const rounded = { x: Math.round(worldX * 100) / 100, y: Math.round(worldY * 100) / 100 }
+    sendGoal(rounded.x, rounded.y)
   }
 
   return (
@@ -143,263 +153,90 @@ function MapPage() {
         </button>
       </div>
 
-      {(message || error || statusError) && (
-        <div className={cn('rounded-3xl border p-4 text-sm', message && !error && 'border-emerald-400/30 bg-emerald-400/10 text-emerald-100', (error || statusError) && 'border-rose-400/30 bg-rose-400/10 text-rose-100')}>
-          {error || statusError || message}
+      {arrivalMessage && (
+        <div className="flex items-center justify-between gap-4 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-5 py-4 text-emerald-200">
+          <div className="flex items-center gap-3">
+            <CheckCircle className="h-5 w-5 shrink-0" />
+            <span className="text-sm font-medium">{arrivalMessage}</span>
+          </div>
+          <button type="button" onClick={clearArrivalMessage} className="text-emerald-400 hover:text-white text-lg leading-none">×</button>
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <div>
-          <article className="sticky top-0 z-30 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 className="flex items-center gap-2 text-lg font-semibold"><MapPinned className="h-5 w-5 text-cyan-200" /> Carte ROS en direct</h2>
-                <p className="mt-2 text-sm text-slate-400">Affichage direct de `/map` reçu par rosbridge puis servi par le backend.</p>
-              </div>
-              <MapMeta map={currentMap} />
-            </div>
+      <div className="grid gap-4 lg:grid-cols-4">
+        <div className="lg:col-span-3">
+          <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+            <h2 className="text-lg font-semibold">Carte SLAM</h2>
+            <p className="mt-2 text-sm text-slate-400">
+              {mapAvailable ? 'Carte chargée depuis le robot' : 'Carte non disponible — lance fetch_map.sh pour la récupérer'}
+            </p>
 
-            <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-slate-950/80 p-3">
-              <OccupancyGridView map={currentMap} pose={backendStatus?.pose ?? null} />
+            {mapAvailable && (
+              <p className="mt-3 flex items-center gap-2 text-sm text-slate-400">
+                <MousePointer2 className="h-4 w-4" />
+                Clique sur la carte pour envoyer le robot à cet endroit
+                {lastGoal && <span className="ml-2 text-amber-300">→ Goal : ({lastGoal.x}m, {lastGoal.y}m)</span>}
+              </p>
+            )}
+
+            <div className="mt-3 overflow-auto rounded-2xl border border-white/10 bg-slate-950/40">
+              {mapAvailable ? (
+                <canvas
+                  ref={canvasRef}
+                  className="max-w-full cursor-crosshair"
+                  style={{ imageRendering: 'pixelated' }}
+                  onClick={handleCanvasClick}
+                />
+              ) : (
+                <div className="flex aspect-video items-center justify-center text-slate-400">
+                  <div className="text-center">
+                    <Bot className="mx-auto mb-3 h-16 w-16 text-slate-500/60" />
+                    <p>Carte non disponible</p>
+                    <p className="mt-1 text-xs text-slate-500">Lance : <code>bash infra/fetch_map.sh</code></p>
+                  </div>
+                </div>
+              )}
             </div>
           </article>
         </div>
 
         <aside className="space-y-4">
           <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <h2 className="flex items-center gap-2 text-base font-semibold"><Compass className="h-4 w-4 text-cyan-200" /> Statut cartographie</h2>
-            <div className="mt-4 space-y-3 text-sm">
-              <InfoRow label="Mode" value={String(modeState?.active ?? backendStatus?.mode ?? 'N/A')} />
-              <InfoRow label="Progression" value={modeProgress || 'inactif'} />
-              <InfoRow label="En attente" value={String(modeState?.pending ?? 'aucun')} />
-              <InfoRow label="Position du robot" value={backendStatus?.pose ? `${backendStatus.pose.x.toFixed(2)}, ${backendStatus.pose.y.toFixed(2)}` : 'N/A'} />
-            </div>
-            {hasModeFailure && (
-              <div className="mt-4 rounded-2xl border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-100">
-                <p className="font-semibold">Erreur du robot</p>
-                <p className="mt-1 text-rose-100/90">{modeError || 'Le tableau de bord du robot a signalé une erreur lors du changement de mode.'}</p>
-                {modeLogTail && <pre className="mt-3 max-h-36 overflow-auto whitespace-pre-wrap rounded-xl bg-slate-950/70 p-3 font-mono text-[11px] text-rose-50/80">{modeLogTail}</pre>}
+            <h2 className="flex items-center gap-2 text-base font-semibold"><Bot className="h-4 w-4" /> Position robot</h2>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-3 text-center">
+                <p className="text-xs text-slate-500">X</p>
+                <p className="text-lg font-mono font-semibold">{((telemetry as any).pose?.x ?? 0).toFixed(2)}m</p>
               </div>
-            )}
+              <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-3 text-center">
+                <p className="text-xs text-slate-500">Y</p>
+                <p className="text-lg font-mono font-semibold">{((telemetry as any).pose?.y ?? 0).toFixed(2)}m</p>
+              </div>
+            </div>
           </article>
 
-          <RobotKeyboardTeleop isAdmin={isAdmin} />
-
-          <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <h2 className="flex items-center gap-2 text-base font-semibold"><Save className="h-4 w-4 text-emerald-200" /> Construire une carte</h2>
-            <p className="mt-2 text-sm text-slate-400">Les fichiers sont sauvegardés dans le conteneur robot sous `/root/maps`.</p>
-            <div className="mt-4 space-y-3">
-              <label className="block space-y-2 text-sm">
-                <span className="text-slate-300">Nom de map</span>
-                <input
-                  value={mapName}
-                  onChange={(event) => setMapName(event.target.value)}
-                  disabled={!isAdmin || isActionRunning}
-                  className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 font-mono text-white disabled:cursor-not-allowed disabled:opacity-60"
-                />
-              </label>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={handleStartMapping}
-                  disabled={!isAdmin || isActionRunning}
-                  className="inline-flex items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Play className="mr-2 h-4 w-4" /> Démarrer la cartographie
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveMap}
-                  disabled={!isAdmin || isActionRunning || !mapName.trim()}
-                  className="inline-flex items-center justify-center rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isActionRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  Sauvegarder
-                </button>
+          {activeMission && (
+            <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+              <h2 className="flex items-center gap-2 text-base font-semibold"><Navigation className="h-5 w-5" /> Mission active</h2>
+              <div className="mt-4 space-y-3 text-sm">
+                <div className="flex items-center justify-between gap-4"><span className="text-slate-400">Destination</span><span className="font-medium text-white">{activeMission.destination}</span></div>
+                <div className="flex items-center justify-between gap-4"><span className="text-slate-400">Type</span><span className="rounded-full border border-white/10 px-3 py-1 capitalize text-white">{activeMission.type}</span></div>
+                <div className="flex items-center justify-between gap-4"><span className="text-slate-400">Statut</span><span className="rounded-full bg-cyan-400/10 px-3 py-1 text-cyan-200">En cours</span></div>
               </div>
               {!isAdmin && <p className="text-xs text-amber-200">Les actions mapping/save/load/delete sont réservées aux administrateurs.</p>}
             </div>
           </article>
 
           <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <h2 className="flex items-center gap-2 text-base font-semibold"><HardDrive className="h-4 w-4 text-cyan-200" /> Maps sauvegardées</h2>
-            <div className="mt-4 space-y-3">
-              {savedMaps.length === 0 && <p className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 text-center text-sm text-slate-400">Aucune map dans `/root/maps`.</p>}
-              {savedMaps.map((map) => (
-                <SavedMapRow
-                  key={map.name}
-                  map={map}
-                  disabled={!isAdmin || isActionRunning}
-                  onLoad={() => handleLoadMap(map.name)}
-                  onDelete={() => handleDeleteMap(map.name)}
-                />
-              ))}
+            <h2 className="flex items-center gap-2 text-base font-semibold"><MapPin className="h-5 w-5" /> Légende</h2>
+            <div className="mt-4 space-y-3 text-sm text-slate-300">
+              <div className="flex items-center gap-3"><div className="h-4 w-4 rounded-full bg-cyan-300" /> Position robot</div>
+              <div className="flex items-center gap-3"><div className="h-4 w-4 rounded-full bg-amber-300" /> Destination</div>
+              <div className="flex items-center gap-3"><div className="h-4 w-4 rounded-full bg-emerald-300" /> En livraison</div>
             </div>
           </article>
         </aside>
       </div>
     </div>
   )
-}
-
-function OccupancyGridView({ map, pose }: { map: RobotMapSnapshot | null; pose: { x: number; y: number; yaw?: number | null } | null }) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas || !map) return
-
-    canvas.width = map.width
-    canvas.height = map.height
-    const context = canvas.getContext('2d')
-    if (!context) return
-
-    const image = context.createImageData(map.width, map.height)
-    for (let screenY = 0; screenY < map.height; screenY += 1) {
-      const sourceY = map.height - 1 - screenY
-      for (let x = 0; x < map.width; x += 1) {
-        const value = map.data[sourceY * map.width + x] ?? -1
-        const offset = (screenY * map.width + x) * 4
-        const [r, g, b] = occupancyColor(value)
-        image.data[offset] = r
-        image.data[offset + 1] = g
-        image.data[offset + 2] = b
-        image.data[offset + 3] = 255
-      }
-    }
-    context.putImageData(image, 0, 0)
-
-    if (pose) {
-      const x = (pose.x - map.origin_x) / map.resolution
-      const y = map.height - (pose.y - map.origin_y) / map.resolution
-      if (x >= 0 && x <= map.width && y >= 0 && y <= map.height) {
-        context.save()
-        context.fillStyle = '#34d399'
-        context.strokeStyle = '#ecfeff'
-        context.lineWidth = Math.max(1, Math.min(map.width, map.height) / 90)
-        context.beginPath()
-        context.arc(x, y, Math.max(2, Math.min(map.width, map.height) / 35), 0, Math.PI * 2)
-        context.fill()
-        context.stroke()
-        const yaw = pose.yaw ?? 0
-        const length = Math.max(5, Math.min(map.width, map.height) / 12)
-        context.beginPath()
-        context.moveTo(x, y)
-        context.lineTo(x + Math.cos(yaw) * length, y - Math.sin(yaw) * length)
-        context.stroke()
-        context.restore()
-      }
-    }
-  }, [map, pose])
-
-  if (!map) {
-    return (
-      <div className="flex aspect-[4/3] items-center justify-center rounded-2xl border border-dashed border-white/10 bg-slate-950/60 p-8 text-center text-sm text-slate-400">
-        <div>
-          <Layers3 className="mx-auto mb-3 h-12 w-12 text-slate-500" />
-          <p className="font-semibold text-white">Aucune OccupancyGrid reçue</p>
-          <p className="mt-2">Démarre le mode mapping ou attends que le robot publie `/map`.</p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className="h-auto max-h-[68vh] w-full rounded-xl bg-slate-950 [image-rendering:pixelated]"
-      style={{ aspectRatio: `${map.width} / ${map.height}` }}
-      aria-label="Carte occupancy grid du robot"
-    />
-  )
-}
-
-function SavedMapRow({ map, disabled, onLoad, onDelete }: { map: SavedRobotMap; disabled: boolean; onLoad: () => void; onDelete: () => void }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate font-mono text-sm font-semibold text-white">{map.name}</p>
-          <p className="mt-1 text-xs text-slate-400">{formatBytes(map.size)} · {formatTimestamp(map.mtime)}</p>
-          <p className="mt-1 text-xs text-cyan-100/80">{Object.keys(map.parts).sort().map((part) => `.${part}`).join(' ') || 'aucun fichier'}</p>
-        </div>
-        {!map.loadable && <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[10px] font-bold text-amber-100">incomplete</span>}
-      </div>
-      <div className="mt-3 flex gap-2">
-        <button
-          type="button"
-          onClick={onLoad}
-          disabled={disabled || !map.loadable}
-          className="inline-flex flex-1 items-center justify-center rounded-xl border border-cyan-300/30 bg-cyan-400/10 px-3 py-2 text-xs font-bold text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Play className="mr-1.5 h-3.5 w-3.5" /> Load
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          disabled={disabled}
-          className="inline-flex items-center justify-center rounded-xl border border-rose-300/30 bg-rose-400/10 px-3 py-2 text-xs font-bold text-rose-100 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function MapMeta({ map }: { map: RobotMapSnapshot | null }) {
-  if (!map) {
-    return <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs font-bold text-amber-100">en attente</span>
-  }
-
-  return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-2 text-right font-mono text-xs text-slate-300">
-      <p>{map.width}x{map.height} @ {map.resolution.toFixed(3)}m</p>
-      <p>{(map.width * map.resolution).toFixed(2)}m x {(map.height * map.resolution).toFixed(2)}m</p>
-    </div>
-  )
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-slate-950/40 px-3 py-2">
-      <span className="text-xs text-slate-400">{label}</span>
-      <span className="font-mono text-sm text-white">{value}</span>
-    </div>
-  )
-}
-
-function occupancyColor(value: number): [number, number, number] {
-  if (value < 0) return [30, 41, 59]
-  if (value === 0) return [226, 232, 240]
-  const shade = Math.max(15, 210 - value * 1.8)
-  return [shade, shade, shade]
-}
-
-function defaultMapName() {
-  return `map_${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}`
-}
-
-function sanitizeMapName(name: string) {
-  return name.trim().replace(/[^a-zA-Z0-9_.-]+/g, '_').replace(/^[._-]+|[._-]+$/g, '').slice(0, 80) || defaultMapName()
-}
-
-function formatBytes(value: number) {
-  if (value < 1024) return `${value} B`
-  return `${(value / 1024).toFixed(0)} KB`
-}
-
-function formatTimestamp(value: number) {
-  if (!value) return 'date inconnue'
-  return new Date(value * 1000).toLocaleString()
-}
-
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Erreur map robot'
-}
-
-function getModeStateText(modeState: Record<string, unknown> | null, key: string) {
-  const value = modeState?.[key]
-  return typeof value === 'string' && value.trim().length > 0 ? value : ''
 }
