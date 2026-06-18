@@ -56,13 +56,6 @@ export function RobotJoystick({ disabled = false, onTeleop }: RobotJoystickProps
     return direction.x === dir.x && direction.y === dir.y
   }
 
-  const btnClass = (key: string) =>
-    `flex h-14 w-14 items-center justify-center rounded-2xl border text-white transition active:scale-95 select-none cursor-pointer ${
-      activeKey === key
-        ? 'border-cyan-400/60 bg-cyan-400/30 scale-95'
-        : 'border-white/20 bg-white/10 hover:bg-white/20'
-    }`
-
   return (
     <div
       ref={containerRef}

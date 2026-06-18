@@ -95,3 +95,29 @@ def test_caregiver_cannot_return_base(
     response = client.post("/api/robot/command/return-base", headers=auth_headers(token))
 
     assert response.status_code == 403
+
+
+def test_admin_can_set_pose_origin(client: TestClient, admin_token: str) -> None:
+    reset_response = client.post("/api/safety/emergency/reset", headers=auth_headers(admin_token))
+    assert reset_response.status_code == 200
+
+    response = client.post("/api/robot/command/set-pose-origin", headers=auth_headers(admin_token))
+
+    assert response.status_code == 200
+    assert response.json()["type"] == "set_pose_origin"
+
+
+def test_caregiver_cannot_set_pose_origin(
+    client: TestClient,
+    admin_token: str,
+    create_caregiver: Callable[[str], tuple[str, str, str]],
+) -> None:
+    reset_response = client.post("/api/safety/emergency/reset", headers=auth_headers(admin_token))
+    assert reset_response.status_code == 200
+
+    _, email, password = create_caregiver()
+    token = login(client, email, password)
+
+    response = client.post("/api/robot/command/set-pose-origin", headers=auth_headers(token))
+
+    assert response.status_code == 403

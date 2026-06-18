@@ -18,6 +18,7 @@ class RobotCommandType(str, Enum):
     emergency_stop = "emergency_stop"
     return_base = "return_base"
     clear_costmaps = "clear_costmaps"
+    set_pose_origin = "set_pose_origin"
 
 
 @dataclass(frozen=True)

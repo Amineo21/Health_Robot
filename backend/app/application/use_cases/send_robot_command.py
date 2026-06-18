@@ -46,6 +46,8 @@ class SendRobotCommandUseCase:
             self._require_role(actor, {UserRole.admin})
         elif command_type == RobotCommandType.clear_costmaps:
             self._require_role(actor, {UserRole.admin})
+        elif command_type == RobotCommandType.set_pose_origin:
+            self._require_role(actor, {UserRole.admin})
 
         command = RobotCommand(
             command_id=f"cmd-{uuid4()}",

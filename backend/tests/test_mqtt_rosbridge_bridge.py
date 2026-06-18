@@ -9,6 +9,7 @@ from app.domain.entities.mqtt_topics import ROBOT_BATTERY_TOPIC, ROBOT_NAV2_PATH
 from app.infrastructure.rosbridge.mqtt_rosbridge_bridge import (
     MqttRosbridgeBridge,
     build_goal_pose_message,
+    build_initial_pose_message,
     build_twist_message,
     parse_mqtt_command_payload,
     telemetry_payload_from_ros_message,
@@ -46,6 +47,17 @@ def test_build_goal_pose_message_matches_rosbridge_dashboard_shape() -> None:
     assert message["pose"]["position"] == {"x": 1.5, "y": -2.0, "z": 0}
     assert message["pose"]["orientation"]["z"] == pytest.approx(1.0)
     assert message["pose"]["orientation"]["w"] == pytest.approx(0.0)
+
+
+def test_build_initial_pose_message_matches_rosbridge_dashboard_shape() -> None:
+    message = build_initial_pose_message(0.0, 0.0, 0.0)
+
+    assert message["header"]["frame_id"] == "map"
+    assert message["pose"]["pose"]["position"] == {"x": 0.0, "y": 0.0, "z": 0}
+    assert message["pose"]["pose"]["orientation"] == {"x": 0, "y": 0, "z": 0.0, "w": 1.0}
+    assert len(message["pose"]["covariance"]) == 36
+    assert message["pose"]["covariance"][0] == 0.25
+    assert message["pose"]["covariance"][35] == pytest.approx(math.pi * math.pi / 9)
 
 
 def test_build_twist_message_matches_cmd_vel_shape() -> None:

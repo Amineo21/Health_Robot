@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 
 import { useAuth } from '@/contexts/AuthContext'
 import { fetchRobotStatus, sendTeleop, triggerEmergencyStop, type RobotStatusSnapshot } from './robot-api'
@@ -18,19 +18,13 @@ export interface Mission {
   startTime: Date
   priority: 'low' | 'medium' | 'high'
   notes?: string
-  x?: number
-  y?: number
 }
 
 export interface RobotTelemetry {
   position: { x: number; y: number; floor: number }
-  pose?: { x: number; y: number; z: number; w: number }
   speed: number
   battery: number
   connectionQuality: number
-  etaSeconds?: number
-  distanceRemaining?: number
-  navPath?: { x: number; y: number }[]
 }
 
 export interface ActivityEvent {
@@ -58,24 +52,28 @@ interface RobotContextType {
   connections: SystemConnection[]
   deliveriesToday: number
   alerts: ActivityEvent[]
-  lastGoal: { x: number; y: number } | null
-  arrivalMessage: string | null
-  clearArrivalMessage: () => void
+  refreshStatus: () => Promise<void>
   addMission: (mission: Omit<Mission, 'id' | 'startTime' | 'status'>) => void
   cancelMission: (id: string) => void
-  sendCommand: (command: 'forward' | 'backward' | 'left' | 'right' | 'stop') => void
-  emergencyStop: () => void
-  sendGoal: (x: number, y: number, destinationName?: string) => void
+  sendCommand: (command: 'forward' | 'backward' | 'left' | 'right' | 'stop') => Promise<void>
+  emergencyStop: () => Promise<void>
 }
 
 const RobotContext = createContext<RobotContextType | null>(null)
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:4000'
-const WS_URL = BACKEND_URL.replace(/^http/, 'ws') + '/ws'
+const initialConnections: SystemConnection[] = [
+  { name: 'Backend API', status: 'connecting' },
+  { name: 'Robot status', status: 'connecting' },
+  { name: 'MQTT command bridge', status: 'connecting' },
+]
 
 export function useRobot() {
   const context = useContext(RobotContext)
-  if (!context) throw new Error('useRobot must be used within a RobotProvider')
+
+  if (!context) {
+    throw new Error('useRobot must be used within a RobotProvider')
+  }
+
   return context
 }
 
@@ -83,14 +81,48 @@ function generateId() {
   return `MSN-${Date.now().toString(36).toUpperCase()}`
 }
 
-function backendModeToStatus(mode: string): RobotStatus {
-  switch (mode) {
-    case 'NAVIGATING': return 'moving'
-    case 'RETURNING_TO_BASE': return 'delivering'
-    case 'CHARGING': return 'charging'
-    case 'EMERGENCY_STOP': return 'idle'
-    default: return 'idle'
+function mapBackendMode(snapshot: RobotStatusSnapshot | null): RobotStatus {
+  if (!snapshot) {
+    return 'idle'
   }
+
+  const mode = snapshot.mode.toLowerCase()
+  if (mode.includes('charge')) {
+    return 'charging'
+  }
+  if (mode.includes('deliver')) {
+    return 'delivering'
+  }
+  if (mode.includes('move') || mode.includes('nav') || mode.includes('return')) {
+    return 'moving'
+  }
+  return 'idle'
+}
+
+function teleopPayloadForCommand(command: 'forward' | 'backward' | 'left' | 'right' | 'stop') {
+  switch (command) {
+    case 'forward':
+      return { linear_x: 0.1, angular_z: 0, duration_ms: 300 }
+    case 'backward':
+      return { linear_x: -0.1, angular_z: 0, duration_ms: 300 }
+    case 'left':
+      return { linear_x: 0, angular_z: 0.2, duration_ms: 300 }
+    case 'right':
+      return { linear_x: 0, angular_z: -0.2, duration_ms: 300 }
+    case 'stop':
+      return { linear_x: 0, angular_z: 0, duration_ms: 300 }
+  }
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : 'Erreur backend robot'
+}
+
+function normalizeSpeed(speed: number | null) {
+  if (speed == null || Math.abs(speed) < 0.001) {
+    return 0
+  }
+  return speed
 }
 
 export function RobotProvider({ children }: { children: ReactNode }) {
@@ -101,155 +133,99 @@ export function RobotProvider({ children }: { children: ReactNode }) {
   const [telemetry, setTelemetry] = useState<RobotTelemetry>({
     position: { x: 0, y: 0, floor: 1 },
     speed: 0,
-    battery: 100,
+    battery: 0,
     connectionQuality: 0,
   })
   const [missions, setMissions] = useState<Mission[]>([])
   const [activityFeed, setActivityFeed] = useState<ActivityEvent[]>([])
-  const [connections, setConnections] = useState<SystemConnection[]>([
-    { name: 'Backend', status: 'connecting' },
-    { name: 'Robot', status: 'disconnected' },
-  ])
-  const [deliveriesToday, setDeliveriesToday] = useState(0)
-  const [lastGoal, setLastGoal] = useState<{ x: number; y: number } | null>(null)
-  const [arrivalMessage, setArrivalMessage] = useState<string | null>(null)
-  const prevStatusRef = useRef<RobotStatus>('idle')
-  const wsRef = useRef<WebSocket | null>(null)
+  const [connections, setConnections] = useState<SystemConnection[]>(initialConnections)
+  const [deliveriesToday] = useState(0)
 
-  const activeMission = missions.find((m) => m.status === 'in-progress') ?? null
-  const alerts = activityFeed.filter((e) => e.type === 'warning' || e.type === 'error')
+  const status = mapBackendMode(backendStatus)
+  const activeMission = missions.find((mission) => mission.status === 'in-progress') || null
+  const alerts = activityFeed.filter((entry) => entry.type === 'warning' || entry.type === 'error')
 
   const addActivity = useCallback((message: string, type: ActivityEvent['type'] = 'info') => {
-    setActivityFeed((prev) => [
-      { id: Date.now().toString(), message, timestamp: new Date(), type },
-      ...prev.slice(0, 49),
-    ])
+    const event: ActivityEvent = {
+      id: Date.now().toString(),
+      message,
+      timestamp: new Date(),
+      type,
+    }
+
+    setActivityFeed((previous) => [event, ...previous.slice(0, 49)])
   }, [])
 
-  // WebSocket connection to backend
-  useEffect(() => {
-    let reconnectTimer: ReturnType<typeof setTimeout>
-
-    function connect() {
-      const ws = new WebSocket(WS_URL)
-      wsRef.current = ws
-
-      setConnections([
-        { name: 'Backend', status: 'connecting' },
-        { name: 'Robot', status: 'disconnected' },
-      ])
-
-      ws.onopen = () => {
-        setConnections([
-          { name: 'Backend', status: 'connected', lastPing: new Date() },
-          { name: 'Robot', status: 'connected', lastPing: new Date() },
-        ])
-        addActivity('Connecté au backend', 'success')
-      }
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data)
-          setStatus(backendModeToStatus(data.mode))
-          setTelemetry((prev) => ({
-            ...prev,
-            battery: data.battery_level ?? prev.battery,
-            speed: data.current_speed_mps ?? prev.speed,
-            etaSeconds: data.eta_to_base_seconds,
-            distanceRemaining: data.distance_remaining_m,
-            pose: data.pose ?? prev.pose,
-            navPath: data.nav_path ?? prev.navPath,
-          }))
-          setConnections([
-            { name: 'Backend', status: 'connected', lastPing: new Date() },
-            { name: 'Robot', status: data.emergency_active ? 'disconnected' : 'connected', lastPing: new Date() },
-          ])
-        } catch {
-          // ignore malformed messages
-        }
-      }
-
-      ws.onclose = () => {
-        setConnections([
-          { name: 'Backend', status: 'disconnected' },
-          { name: 'Robot', status: 'disconnected' },
-        ])
-        addActivity('Connexion perdue, reconnexion...', 'warning')
-        reconnectTimer = setTimeout(connect, 3000)
-      }
-
-      ws.onerror = () => ws.close()
+  const refreshStatus = useCallback(async () => {
+    if (!isAuthenticated) {
+      setBackendStatus(null)
+      setTelemetry((previous) => ({ ...previous, speed: 0, battery: 0, connectionQuality: 0 }))
+      setConnections(initialConnections)
+      return
     }
 
-    connect()
-    return () => {
-      clearTimeout(reconnectTimer)
-      wsRef.current?.close()
-    }
-  }, [addActivity])
-
-  // Détection arrivée : moving → idle avec un goal actif
-  useEffect(() => {
-    if (prevStatusRef.current === 'moving' && status === 'idle' && lastGoal) {
-      setArrivalMessage(`Robot arrivé à destination (${lastGoal.x}m, ${lastGoal.y}m)`)
-      setLastGoal(null)
-    }
-    prevStatusRef.current = status
-  }, [status, lastGoal])
-
-  const clearArrivalMessage = useCallback(() => setArrivalMessage(null), [])
-
-  const sendGoal = useCallback(async (x: number, y: number, destinationName?: string) => {
-    const missionId = generateId()
+    setIsStatusLoading(true)
     try {
-      // Annule le goal précédent s'il y en a un
-      await fetch(`${BACKEND_URL}/api/navigation/cancel`, { method: 'POST' })
-      await fetch(`${BACKEND_URL}/api/navigation/goal`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ x, y, mission_id: missionId, destination_name: destinationName }),
-      })
-      setLastGoal({ x, y })
-      addActivity(`Goal envoyé : ${destinationName ?? `(${x}, ${y})`}`, 'info')
-    } catch {
-      addActivity('Erreur envoi goal navigation', 'error')
+      const snapshot = await fetchRobotStatus()
+      const now = new Date()
+      setBackendStatus(snapshot)
+      setStatusError(null)
+      setTelemetry((previous) => ({
+        ...previous,
+        position: snapshot.pose ? { ...previous.position, x: snapshot.pose.x, y: snapshot.pose.y } : previous.position,
+        speed: normalizeSpeed(snapshot.current_speed_mps),
+        battery: snapshot.battery_level,
+        connectionQuality: 100,
+      }))
+      setConnections([
+        { name: 'Backend API', status: 'connected', lastPing: now },
+        { name: 'Robot status', status: 'connected', lastPing: now },
+        { name: 'MQTT command bridge', status: 'connected', lastPing: now },
+      ])
+    } catch (error) {
+      setStatusError(getErrorMessage(error))
+      setConnections((previous) =>
+        previous.map((connection) => ({
+          ...connection,
+          status: 'disconnected',
+        })),
+      )
+    } finally {
+      setIsStatusLoading(false)
     }
-  }, [addActivity])
+  }, [isAuthenticated])
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return
+    }
+
+    void refreshStatus()
+    const interval = window.setInterval(() => {
+      void refreshStatus()
+    }, 3000)
+
+    return () => window.clearInterval(interval)
+  }, [isAuthenticated, refreshStatus])
 
   const addMission = useCallback(
-    async (mission: Omit<Mission, 'id' | 'startTime' | 'status'>) => {
+    (mission: Omit<Mission, 'id' | 'startTime' | 'status'>) => {
       const newMission: Mission = {
         ...mission,
         id: generateId(),
         startTime: new Date(),
         status: 'pending',
       }
-      setMissions((prev) => [newMission, ...prev])
-      addActivity(`Nouvelle mission créée pour ${mission.destination}`, 'info')
 
-      if (mission.x !== undefined && mission.y !== undefined) {
-        await sendGoal(mission.x, mission.y, mission.destination)
-      }
-
-      setMissions((prev) =>
-        prev.map((m) => (m.id === newMission.id ? { ...m, status: 'in-progress' } : m)),
-      )
+      setMissions((previous) => [newMission, ...previous])
+      addActivity(`Mission locale créée pour ${mission.destination}`, 'info')
     },
-    [addActivity, sendGoal],
+    [addActivity],
   )
 
   const cancelMission = useCallback(
-    async (id: string) => {
-      try {
-        await fetch(`${BACKEND_URL}/api/safety/emergency`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ source: 'ui', reason: `Mission ${id} annulée par l'opérateur`, requires_admin_restart: false }),
-        })
-      } catch {
-        // best-effort
-      }
-      setMissions((prev) => prev.map((m) => (m.id === id ? { ...m, status: 'cancelled' } : m)))
+    (id: string) => {
+      setMissions((previous) => previous.map((mission) => (mission.id === id ? { ...mission, status: 'cancelled' } : mission)))
       addActivity(`Mission ${id} annulée`, 'warning')
     },
     [addActivity],
@@ -257,33 +233,19 @@ export function RobotProvider({ children }: { children: ReactNode }) {
 
   const sendCommand = useCallback(
     async (command: 'forward' | 'backward' | 'left' | 'right' | 'stop') => {
-      try {
-        await fetch(`${BACKEND_URL}/api/robot/cmd_vel`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ command }),
-        })
-      } catch {
-        addActivity('Erreur envoi commande manuelle', 'error')
-      }
+      await sendTeleop(teleopPayloadForCommand(command))
+      addActivity(`Commande téléop envoyée: ${command.toUpperCase()}`, 'info')
+      await refreshStatus()
     },
-    [addActivity],
+    [addActivity, refreshStatus],
   )
 
   const emergencyStop = useCallback(async () => {
-    await Promise.allSettled([
-      fetch(`${BACKEND_URL}/api/safety/emergency`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: 'ui', reason: "Arrêt d'urgence déclenché depuis l'interface", requires_admin_restart: true }),
-      }),
-      fetch(`${BACKEND_URL}/api/navigation/cancel`, { method: 'POST' }),
-    ])
-    setStatus('idle')
-    setLastGoal(null)
-    setMissions((prev) => prev.map((m) => (m.status === 'in-progress' ? { ...m, status: 'cancelled' } : m)))
-    addActivity("ARRÊT D'URGENCE ACTIVÉ", 'error')
-  }, [addActivity])
+    await triggerEmergencyStop('manual_ui_stop')
+    setMissions((previous) => previous.map((mission) => (mission.status === 'in-progress' ? { ...mission, status: 'cancelled' } : mission)))
+    addActivity('ARRÊT D’URGENCE ACTIVÉ', 'error')
+    await refreshStatus()
+  }, [addActivity, refreshStatus])
 
   return (
     <RobotContext.Provider
@@ -299,14 +261,11 @@ export function RobotProvider({ children }: { children: ReactNode }) {
         connections,
         deliveriesToday,
         alerts,
-        lastGoal,
-        arrivalMessage,
-        clearArrivalMessage,
+        refreshStatus,
         addMission,
         cancelMission,
         sendCommand,
         emergencyStop,
-        sendGoal,
       }}
     >
       {children}

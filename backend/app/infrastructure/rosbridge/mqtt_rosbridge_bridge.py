@@ -34,6 +34,7 @@ COMMAND_SUBSCRIPTIONS: tuple[tuple[str, int], ...] = (
 
 ROSBRIDGE_ADVERTISE_TOPICS: tuple[tuple[str, str], ...] = (
     ("/goal_pose", "geometry_msgs/msg/PoseStamped"),
+    ("/initialpose", "geometry_msgs/msg/PoseWithCovarianceStamped"),
     ("/cmd_vel", "geometry_msgs/msg/Twist"),
     ("/arm6_joints", "arm_msgs/msg/ArmJoints"),
 )
@@ -328,6 +329,13 @@ class MqttRosbridgeBridge:
             self._clear_costmaps()
             return
 
+        if command_type == "set_pose_origin":
+            self._publish_initial_pose(0.0, 0.0, 0.0)
+            timer = threading.Timer(0.4, self._clear_costmaps)
+            timer.daemon = True
+            timer.start()
+            return
+
         raise ValueError(f"type de commande non supporte: {command_type}")
 
     def _handle_admin_command(self, payload: dict[str, Any]) -> None:
@@ -354,6 +362,15 @@ class MqttRosbridgeBridge:
                 "op": "publish",
                 "topic": "/goal_pose",
                 "msg": build_goal_pose_message(x, y, yaw),
+            }
+        )
+
+    def _publish_initial_pose(self, x: float, y: float, yaw: float) -> None:
+        self._send_rosbridge(
+            {
+                "op": "publish",
+                "topic": "/initialpose",
+                "msg": build_initial_pose_message(x, y, yaw),
             }
         )
 
@@ -521,7 +538,7 @@ def parse_mqtt_command_payload(topic: str, message: dict[str, Any]) -> tuple[str
     action = message.get("action")
     if action == "return_to_base":
         return "return_base", message
-    if action in {"emergency_stop", "clear_costmaps"}:
+    if action in {"emergency_stop", "clear_costmaps", "set_pose_origin"}:
         return str(action), message
 
     command_by_topic = {
@@ -541,6 +558,29 @@ def build_goal_pose_message(x: float, y: float, yaw: float) -> dict[str, Any]:
         "pose": {
             "position": {"x": x, "y": y, "z": 0},
             "orientation": {"x": 0, "y": 0, "z": qz, "w": qw},
+        },
+    }
+
+
+def build_initial_pose_message(x: float, y: float, yaw: float) -> dict[str, Any]:
+    qz = math.sin(yaw / 2.0)
+    qw = math.cos(yaw / 2.0)
+    now = int(time.time())
+    covariance = [0.0] * 36
+    covariance[0] = 0.25
+    covariance[7] = 0.25
+    covariance[14] = 9999
+    covariance[21] = 9999
+    covariance[28] = 9999
+    covariance[35] = math.pi * math.pi / 9
+    return {
+        "header": {"frame_id": "map", "stamp": {"sec": now, "nanosec": 0}},
+        "pose": {
+            "pose": {
+                "position": {"x": x, "y": y, "z": 0},
+                "orientation": {"x": 0, "y": 0, "z": qz, "w": qw},
+            },
+            "covariance": covariance,
         },
     }
 

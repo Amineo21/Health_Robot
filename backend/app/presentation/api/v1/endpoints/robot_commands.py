@@ -110,6 +110,25 @@ def return_to_base(use_cases: UseCasesDep, current_user: AdminUserDep) -> RobotC
 
 
 @router.post(
+    "/set-pose-origin",
+    response_model=RobotCommandResponse,
+    summary="Set robot pose to map origin",
+    description="Publishes /initialpose at (0, 0, 0) through rosbridge. Requires admin access.",
+    responses={
+        400: {"description": "Invalid or rejected set-pose-origin command."},
+        401: {"description": "Missing, invalid, or expired bearer token."},
+        403: {"description": "Only admin users can set the robot pose origin."},
+    },
+)
+def set_pose_origin(use_cases: UseCasesDep, current_user: AdminUserDep) -> RobotCommandResponse:
+    try:
+        command = use_cases.send_robot_command.execute(RobotCommandType.set_pose_origin, current_user)
+    except (RobotCommandForbiddenError, RobotCommandRejectedError) as exc:
+        raise _map_command_error(exc) from None
+    return RobotCommandResponse.from_domain(command)
+
+
+@router.post(
     "/clear-costmaps",
     response_model=RobotCommandResponse,
     summary="Clear Nav2 costmaps",

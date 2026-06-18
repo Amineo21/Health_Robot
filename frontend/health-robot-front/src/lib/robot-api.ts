@@ -205,6 +205,12 @@ export function returnBase() {
   })
 }
 
+export function setPoseOrigin() {
+  return apiFetch<RobotCommandResponse>('/api/robot/command/set-pose-origin', {
+    method: 'POST',
+  })
+}
+
 export function clearCostmaps() {
   return apiFetch<RobotCommandResponse>('/api/robot/command/clear-costmaps', {
     method: 'POST',

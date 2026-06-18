@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { setAccessToken } from './api'
-import { commandRobotArm, fetchCurrentRobotMap, fetchRobotCameraSnapshot, loadSavedRobotMap, navigateToPosition, saveCurrentRobotMap, sendTeleop, uploadRobotSound } from './robot-api'
+import { commandRobotArm, fetchCurrentRobotMap, fetchRobotCameraSnapshot, loadSavedRobotMap, navigateToPosition, returnBase, saveCurrentRobotMap, sendTeleop, setPoseOrigin, uploadRobotSound } from './robot-api'
 
 const fetchMock = vi.fn()
 
@@ -40,6 +40,26 @@ describe('robot-api', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:4000/api/robot/command/teleop')
     expect(init.method).toBe('POST')
     expect(JSON.parse(init.body as string)).toEqual({ linear_x: 0.1, angular_z: 0.2, duration_ms: 300 })
+  })
+
+  it('posts return base through backend', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ command_id: 'cmd-home', status: 'published' }))
+
+    await returnBase()
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:4000/api/robot/command/return-base')
+    expect(init.method).toBe('POST')
+  })
+
+  it('posts set pose origin through backend', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ command_id: 'cmd-origin', status: 'published' }))
+
+    await setPoseOrigin()
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:4000/api/robot/command/set-pose-origin')
+    expect(init.method).toBe('POST')
   })
 
   it('fetches the current robot map through backend', async () => {
