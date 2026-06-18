@@ -187,11 +187,11 @@ export function RobotKeyboardTeleop({
         )}
       >
         {isTeleopOn ? <Square className="mr-2 h-4 w-4" /> : <Keyboard className="mr-2 h-4 w-4" />}
-        {isTeleopOn ? 'Stop teleop' : 'Activer teleop clavier'}
+        {isTeleopOn ? 'Arrêter la conduite' : 'Activer la conduite au clavier'}
       </button>
 
       <div className="mt-4 grid gap-2 text-sm">
-        <TeleopInfoRow label="Etat" value={isTeleopOn ? 'actif' : 'inactif'} />
+        <TeleopInfoRow label="État" value={isTeleopOn ? 'actif' : 'inactif'} />
         <TeleopInfoRow label="Touches" value={activeLabel} />
         <TeleopInfoRow label="Dernier cmd_vel" value={payloadLabel} />
         <TeleopInfoRow label="Dernier envoi" value={lastSentAt} />

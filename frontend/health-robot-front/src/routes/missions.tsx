@@ -9,17 +9,17 @@ import { CAREGIVER_OR_ADMIN_ROLES } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
 const rooms = [
-  'Room 101', 'Room 102', 'Room 103',
-  'Room 201', 'Room 202', 'Room 203',
-  'Room 301', 'Room 302', 'Room 303',
-  'Nurses Station', 'Pharmacy', 'Kitchen',
+  'Chambre 101', 'Chambre 102', 'Chambre 103',
+  'Chambre 201', 'Chambre 202', 'Chambre 203',
+  'Chambre 301', 'Chambre 302', 'Chambre 303',
+  'Poste infirmier', 'Pharmacie', 'Cuisine',
 ]
 
 const statusConfig = {
-  pending: { label: 'Pending', icon: Clock, color: 'text-slate-300', bg: 'bg-white/10' },
-  'in-progress': { label: 'In Progress', icon: CheckCircle, color: 'text-cyan-200', bg: 'bg-cyan-400/10' },
-  completed: { label: 'Completed', icon: CheckCircle, color: 'text-emerald-200', bg: 'bg-emerald-400/10' },
-  cancelled: { label: 'Cancelled', icon: XCircle, color: 'text-rose-200', bg: 'bg-rose-400/10' },
+  pending: { label: 'En attente', icon: Clock, color: 'text-slate-300', bg: 'bg-white/10' },
+  'in-progress': { label: 'En cours', icon: CheckCircle, color: 'text-cyan-200', bg: 'bg-cyan-400/10' },
+  completed: { label: 'Terminée', icon: CheckCircle, color: 'text-emerald-200', bg: 'bg-emerald-400/10' },
+  cancelled: { label: 'Annulée', icon: XCircle, color: 'text-rose-200', bg: 'bg-rose-400/10' },
 } as const
 
 export const Route = createFileRoute('/missions')({ component: MissionsRoute })
@@ -58,28 +58,28 @@ function MissionsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Missions</h1>
-          <p className="text-sm text-slate-400">Create and manage robot delivery missions</p>
+          <p className="text-sm text-slate-400">Créer et gérer les missions de livraison du robot</p>
         </div>
       </div>
 
       <section className="grid gap-6 lg:grid-cols-2">
         <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-          <h2 className="text-lg font-semibold">Create New Mission</h2>
-          <p className="mt-2 text-sm text-slate-400">Send the robot on a new delivery mission</p>
+          <h2 className="text-lg font-semibold">Créer une nouvelle mission</h2>
+          <p className="mt-2 text-sm text-slate-400">Envoyer le robot en mission de livraison</p>
 
           <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
             <label className="block space-y-2 text-sm">
-              <span className="text-slate-300">Mission Type</span>
+              <span className="text-slate-300">Type de mission</span>
               <select className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white" value={type} onChange={(event) => setType(event.target.value as MissionType)}>
-                <option value="medical">Medical Delivery</option>
-                <option value="meal">Meal Distribution</option>
+                <option value="medical">Livraison médicale</option>
+                <option value="meal">Distribution de repas</option>
               </select>
             </label>
 
             <label className="block space-y-2 text-sm">
-              <span className="text-slate-300">Destination Room</span>
+              <span className="text-slate-300">Chambre de destination</span>
               <select className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white" value={destination} onChange={(event) => setDestination(event.target.value)}>
-                <option value="">Select destination</option>
+                <option value="">Sélectionner une destination</option>
                 {rooms.map((room) => (
                   <option key={room} value={room}>{room}</option>
                 ))}
@@ -87,38 +87,38 @@ function MissionsPage() {
             </label>
 
             <label className="block space-y-2 text-sm">
-              <span className="text-slate-300">Priority</span>
+              <span className="text-slate-300">Priorité</span>
               <select className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white" value={priority} onChange={(event) => setPriority(event.target.value as 'low' | 'medium' | 'high')}>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
+                <option value="low">Basse</option>
+                <option value="medium">Moyenne</option>
+                <option value="high">Haute</option>
               </select>
             </label>
 
             <label className="block space-y-2 text-sm">
-              <span className="text-slate-300">Notes (Optional)</span>
+              <span className="text-slate-300">Remarques (Optionnel)</span>
               <textarea
                 className="min-h-28 w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white"
-                placeholder="Add any special instructions..."
+                placeholder="Ajouter des instructions spéciales..."
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
               />
             </label>
 
             <button type="submit" disabled={!destination} className="inline-flex items-center gap-2 rounded-2xl bg-cyan-400 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60">
-              <Plus className="h-4 w-4" /> Send Mission
+              <Plus className="h-4 w-4" /> Envoyer la mission
             </button>
           </form>
         </article>
 
         <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-          <h2 className="text-lg font-semibold">Mission History</h2>
-          <p className="mt-2 text-sm text-slate-400">View all past and current delivery missions</p>
+          <h2 className="text-lg font-semibold">Historique des missions</h2>
+          <p className="mt-2 text-sm text-slate-400">Voir toutes les missions passées et actuelles</p>
 
           <div className="mt-5 space-y-3">
             {missions.length === 0 ? (
               <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-6 text-center text-slate-400">
-                No missions yet. Create your first mission to get started.
+                Aucune mission pour le moment. Créez votre première mission pour commencer.
               </div>
             ) : (
               missions.map((mission) => {
@@ -133,7 +133,7 @@ function MissionsPage() {
                       </div>
                       {(mission.status === 'pending' || mission.status === 'in-progress') && (
                         <button type="button" onClick={() => cancelMission(mission.id)} className="rounded-xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-medium text-rose-200">
-                          Cancel
+                          Annuler
                         </button>
                       )}
                     </div>

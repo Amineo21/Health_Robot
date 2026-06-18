@@ -34,7 +34,7 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'Health Robot Front',
+        title: 'CareBot - Contrôle de Robot',
       },
     ],
     links: [
@@ -49,7 +49,7 @@ export const Route = createRootRoute({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="fr">
       <head>
         <HeadContent />
       </head>

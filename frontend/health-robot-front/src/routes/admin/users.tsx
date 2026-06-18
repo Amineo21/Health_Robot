@@ -90,7 +90,7 @@ function AdminUsersPage() {
     <div className="space-y-6 px-4 py-6 text-white sm:px-6 lg:px-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Admin Users</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Gestion des utilisateurs</h1>
           <p className="text-sm text-slate-400">Gestion des comptes admin/caregiver via le backend</p>
         </div>
         <button
@@ -111,10 +111,10 @@ function AdminUsersPage() {
       <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
         <h2 className="flex items-center gap-2 text-lg font-semibold"><UserPlus className="h-5 w-5" /> Créer un user</h2>
         <form className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4" onSubmit={handleCreate}>
-          <TextField label="Name" value={newUser.name} onChange={(value) => setNewUser((previous) => ({ ...previous, name: value }))} required />
-          <TextField label="Email" type="email" value={newUser.email} onChange={(value) => setNewUser((previous) => ({ ...previous, email: value }))} required />
+          <TextField label="Nom" value={newUser.name} onChange={(value) => setNewUser((previous) => ({ ...previous, name: value }))} required />
+          <TextField label="E-mail" type="email" value={newUser.email} onChange={(value) => setNewUser((previous) => ({ ...previous, email: value }))} required />
           <label className="space-y-2 text-sm">
-            <span className="text-slate-300">Role</span>
+            <span className="text-slate-300">Rôle</span>
             <select
               value={newUser.role}
               onChange={(event) => setNewUser((previous) => ({ ...previous, role: event.target.value as UserRole }))}
@@ -123,7 +123,7 @@ function AdminUsersPage() {
               {roles.map((role) => <option key={role} value={role}>{role}</option>)}
             </select>
           </label>
-          <TextField label="Password" type="password" value={newUser.password} onChange={(value) => setNewUser((previous) => ({ ...previous, password: value }))} required />
+          <TextField label="Mot de passe" type="password" value={newUser.password} onChange={(value) => setNewUser((previous) => ({ ...previous, password: value }))} required />
           <div className="md:col-span-2 xl:col-span-4">
             <button
               type="submit"
@@ -137,7 +137,7 @@ function AdminUsersPage() {
       </section>
 
       <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-        <h2 className="flex items-center gap-2 text-lg font-semibold"><Shield className="h-5 w-5" /> Users</h2>
+        <h2 className="flex items-center gap-2 text-lg font-semibold"><Shield className="h-5 w-5" /> Utilisateurs</h2>
         {isLoading ? (
           <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/40 p-6 text-center text-slate-400">Chargement...</div>
         ) : (
@@ -145,11 +145,11 @@ function AdminUsersPage() {
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead className="text-xs uppercase tracking-widest text-slate-500">
                 <tr>
-                  <th className="px-3 py-3">Name</th>
-                  <th className="px-3 py-3">Email</th>
-                  <th className="px-3 py-3">Role</th>
-                  <th className="px-3 py-3">Active</th>
-                  <th className="px-3 py-3">Reset password</th>
+                  <th className="px-3 py-3">Nom</th>
+                  <th className="px-3 py-3">E-mail</th>
+                  <th className="px-3 py-3">Rôle</th>
+                  <th className="px-3 py-3">Actif</th>
+                  <th className="px-3 py-3">Réinitialiser le mot de passe</th>
                   <th className="px-3 py-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -170,7 +170,7 @@ function AdminUsersPage() {
                     </td>
                     <td className="px-3 py-4">
                       <span className={`rounded-full px-3 py-1 text-xs font-medium ${user.is_active ? 'bg-emerald-400/10 text-emerald-200' : 'bg-rose-400/10 text-rose-200'}`}>
-                        {user.is_active ? 'active' : 'inactive'}
+                        {user.is_active ? 'Actif' : 'Inactif'}
                       </span>
                     </td>
                     <td className="px-3 py-4">
@@ -188,7 +188,7 @@ function AdminUsersPage() {
                           onClick={() => void handleResetPassword(user.id)}
                           className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          Reset
+                          Réinitialiser
                         </button>
                       </div>
                     </td>

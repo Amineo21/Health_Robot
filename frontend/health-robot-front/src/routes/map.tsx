@@ -107,30 +107,30 @@ function MapPage() {
   }
 
   const handleStartMapping = () => {
-    if (!window.confirm('Démarrer le mode mapping sur le robot ? Cela peut relancer la stack ROS active.')) return
-    void runMapAction(startMappingMode, 'Mode mapping demandé au robot')
+    if (!window.confirm('Démarrer le mode de cartographie sur le robot ? Cela peut relancer la pile ROS active.')) return
+    void runMapAction(startMappingMode, 'Mode cartographie demandé au robot')
   }
 
   const handleSaveMap = () => {
-    void runMapAction(() => saveCurrentRobotMap(mapName), `Map sauvegardée dans /root/maps/${sanitizeMapName(mapName)}`)
+    void runMapAction(() => saveCurrentRobotMap(mapName), `Carte sauvegardée dans /root/maps/${sanitizeMapName(mapName)}`)
   }
 
   const handleLoadMap = (name: string) => {
-    if (!window.confirm(`Charger la map "${name}" en navigation ? Cela arrête le mapping manuel et démarre Nav2.`)) return
-    void runMapAction(() => loadSavedRobotMap(name), `Chargement de la map ${name} demandé`)
+    if (!window.confirm(`Charger la carte "é${name}" en navigation ? Cela arrête la cartographie manuelle et démarre Nav2.`)) return
+    void runMapAction(() => loadSavedRobotMap(name), `Chargement de la carte ${name} demandé`)
   }
 
   const handleDeleteMap = (name: string) => {
-    if (!window.confirm(`Supprimer la map "${name}" depuis /root/maps ?`)) return
-    void runMapAction(() => deleteSavedRobotMap(name), `Map ${name} supprimée`)
+    if (!window.confirm(`Supprimer la carte "é${name}" depuis /root/maps ?`)) return
+    void runMapAction(() => deleteSavedRobotMap(name), `Carte ${name} supprimée`)
   }
 
   return (
     <div className="space-y-6 px-4 py-6 text-white sm:px-6 lg:px-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Robot Mapping</h1>
-          <p className="text-sm text-slate-400">Construction, sauvegarde et affichage de la map ROS depuis le backend sécurisé.</p>
+          <h1 className="text-2xl font-bold tracking-tight">Cartographie du robot</h1>
+          <p className="text-sm text-slate-400">Construction, sauvegarde et affichage de la carte ROS depuis le backend sécurisé.</p>
         </div>
         <button
           type="button"
@@ -154,7 +154,7 @@ function MapPage() {
           <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h2 className="flex items-center gap-2 text-lg font-semibold"><MapPinned className="h-5 w-5 text-cyan-200" /> Map ROS live</h2>
+                <h2 className="flex items-center gap-2 text-lg font-semibold"><MapPinned className="h-5 w-5 text-cyan-200" /> Carte ROS en direct</h2>
                 <p className="mt-2 text-sm text-slate-400">Affichage direct de `/map` reçu par rosbridge puis servi par le backend.</p>
               </div>
               <MapMeta map={currentMap} />
@@ -168,17 +168,17 @@ function MapPage() {
 
         <aside className="space-y-4">
           <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <h2 className="flex items-center gap-2 text-base font-semibold"><Compass className="h-4 w-4 text-cyan-200" /> Statut mapping</h2>
+            <h2 className="flex items-center gap-2 text-base font-semibold"><Compass className="h-4 w-4 text-cyan-200" /> Statut cartographie</h2>
             <div className="mt-4 space-y-3 text-sm">
               <InfoRow label="Mode" value={String(modeState?.active ?? backendStatus?.mode ?? 'N/A')} />
-              <InfoRow label="Progress" value={modeProgress || 'idle'} />
-              <InfoRow label="Pending" value={String(modeState?.pending ?? 'none')} />
-              <InfoRow label="Robot pose" value={backendStatus?.pose ? `${backendStatus.pose.x.toFixed(2)}, ${backendStatus.pose.y.toFixed(2)}` : 'N/A'} />
+              <InfoRow label="Progression" value={modeProgress || 'inactif'} />
+              <InfoRow label="En attente" value={String(modeState?.pending ?? 'aucun')} />
+              <InfoRow label="Position du robot" value={backendStatus?.pose ? `${backendStatus.pose.x.toFixed(2)}, ${backendStatus.pose.y.toFixed(2)}` : 'N/A'} />
             </div>
             {hasModeFailure && (
               <div className="mt-4 rounded-2xl border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-100">
-                <p className="font-semibold">Erreur robot</p>
-                <p className="mt-1 text-rose-100/90">{modeError || 'Le dashboard robot a signalé une erreur pendant le changement de mode.'}</p>
+                <p className="font-semibold">Erreur du robot</p>
+                <p className="mt-1 text-rose-100/90">{modeError || 'Le tableau de bord du robot a signalé une erreur lors du changement de mode.'}</p>
                 {modeLogTail && <pre className="mt-3 max-h-36 overflow-auto whitespace-pre-wrap rounded-xl bg-slate-950/70 p-3 font-mono text-[11px] text-rose-50/80">{modeLogTail}</pre>}
               </div>
             )}
@@ -187,7 +187,7 @@ function MapPage() {
           <RobotKeyboardTeleop isAdmin={isAdmin} />
 
           <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <h2 className="flex items-center gap-2 text-base font-semibold"><Save className="h-4 w-4 text-emerald-200" /> Construire une map</h2>
+            <h2 className="flex items-center gap-2 text-base font-semibold"><Save className="h-4 w-4 text-emerald-200" /> Construire une carte</h2>
             <p className="mt-2 text-sm text-slate-400">Les fichiers sont sauvegardés dans le conteneur robot sous `/root/maps`.</p>
             <div className="mt-4 space-y-3">
               <label className="block space-y-2 text-sm">

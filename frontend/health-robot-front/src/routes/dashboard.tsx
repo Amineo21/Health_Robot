@@ -27,7 +27,7 @@ function DashboardPage() {
 
   const cards = [
     {
-      label: 'Mode robot',
+      label: 'Mode du robot',
       value: backendStatus?.mode ?? status,
       icon: Activity,
     },
@@ -37,12 +37,12 @@ function DashboardPage() {
       icon: Battery,
     },
     {
-      label: 'Vitesse courante',
+      label: 'Vitesse actuelle',
       value: `${backendStatus?.current_speed_mps ?? 0} m/s`,
       icon: Gauge,
     },
     {
-      label: 'Emergency stop',
+      label: 'Arrêt d\'urgence',
       value: backendStatus?.emergency_active ? 'Actif' : 'Inactif',
       icon: OctagonX,
     },
@@ -55,10 +55,10 @@ function DashboardPage() {
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.28em] text-cyan-300">
-                Dashboard
+                Tableau de bord
               </p>
               <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">
-                Bonjour {user.name}
+                Bienvenue {user.name}
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
                 Supervision connectée au backend FastAPI. Les commandes robot passent par l'API et les droits suivent ton rôle.
@@ -70,14 +70,14 @@ function DashboardPage() {
                 to="/control"
                 className="rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
               >
-                Contrôler le robot
+                Accéder au contrôle
               </Link>
               <RoleGuard allowedRoles={ADMIN_ROLES}>
                 <Link
                   to="/admin/users"
                   className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10"
                 >
-                  <Users className="h-4 w-4" /> Users
+                  <Users className="h-4 w-4" /> Utilisateurs
                 </Link>
               </RoleGuard>
               <button
@@ -93,7 +93,7 @@ function DashboardPage() {
 
         {statusError && (
           <div className="rounded-3xl border border-rose-400/30 bg-rose-400/10 p-4 text-sm text-rose-100">
-            Statut robot indisponible : {statusError}
+            État du robot indisponible : {statusError}
           </div>
         )}
 
@@ -118,17 +118,17 @@ function DashboardPage() {
               <RouteIcon className="h-5 w-5 text-cyan-200" /> Mission en cours
             </h2>
             <dl className="mt-4 grid gap-3 text-sm text-slate-300 sm:grid-cols-2">
-              <InfoItem label="Mission ID" value={backendStatus?.mission_id ?? 'Aucune'} />
-              <InfoItem label="ETA base" value={backendStatus?.eta_to_base_seconds == null ? 'N/A' : `${backendStatus.eta_to_base_seconds}s`} />
+              <InfoItem label="ID de mission" value={backendStatus?.mission_id ?? 'Aucune'} />
+              <InfoItem label="ETA à la base" value={backendStatus?.eta_to_base_seconds == null ? 'N/A' : `${backendStatus.eta_to_base_seconds}s`} />
               <InfoItem label="Distance restante" value={backendStatus?.distance_remaining_m == null ? 'N/A' : `${backendStatus.distance_remaining_m}m`} />
-              <InfoItem label="Chargement" value={isStatusLoading ? 'Polling...' : 'Toutes les 3s'} />
+              <InfoItem label="Statut" value={isStatusLoading ? 'Synchronisation...' : 'Toutes les 3s'} />
             </dl>
           </article>
 
           <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
             <h2 className="text-xl font-semibold">Compte actif</h2>
             <dl className="mt-4 space-y-3 text-sm text-slate-300">
-              <InfoItem label="Email" value={user.email} />
+              <InfoItem label="E-mail" value={user.email} />
               <InfoItem label="Rôle" value={user.role} />
             </dl>
           </article>

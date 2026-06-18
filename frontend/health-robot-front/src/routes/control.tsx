@@ -14,9 +14,9 @@ export const Route = createFileRoute('/control')({ component: ControlRoute })
 
 const DEFAULT_ARM_JOINTS = [90, 90, 90, 90, 90, 90]
 const ARM_PRESETS = [
-  { name: 'Center', joints: [90, 90, 90, 90, 90, 90] },
-  { name: 'Camera forward', joints: [90, 60, 45, 90, 90, 90] },
-  { name: 'Camera up', joints: [90, 30, 60, 90, 90, 90] },
+  { name: 'Centre', joints: [90, 90, 90, 90, 90, 90] },
+  { name: 'Caméra avant', joints: [90, 60, 45, 90, 90, 90] },
+  { name: 'Caméra haut', joints: [90, 30, 60, 90, 90, 90] },
 ]
 
 function ControlRoute() {
@@ -88,15 +88,15 @@ function ControlPage() {
   return (
     <div className="space-y-6 px-4 py-6 text-white sm:px-6 lg:px-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Robot Control</h1>
-        <p className="text-sm text-slate-400">Commandes backend FastAPI vers MQTT. Aucun accès direct ROS2 depuis le frontend.</p>
+        <h1 className="text-2xl font-bold tracking-tight">Contrôle du robot</h1>
+        <p className="text-sm text-slate-400">Commandes API FastAPI vers MQTT. Accès direct ROS2 depuis le frontend non disponible.</p>
       </div>
 
       {backendStatus?.emergency_active && (
         <div className="flex items-start gap-3 rounded-3xl border border-rose-400/40 bg-rose-500/15 p-4 text-sm text-rose-50 shadow-lg shadow-rose-950/20">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-200" />
           <div>
-            <p className="font-bold">Emergency active</p>
+            <p className="font-bold">Urgence active</p>
             <p className="mt-1 text-rose-100/80">Le backend indique un arrêt d'urgence actif. Le reset est réservé aux administrateurs.</p>
           </div>
         </div>
@@ -110,7 +110,7 @@ function ControlPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <section className="space-y-4 lg:col-span-2">
-          <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+          <article className="sticky top-0 z-30 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
             <h2 className="text-lg font-semibold">Navigation libre</h2>
             <p className="mt-2 text-sm text-slate-400">Disponible pour admin et caregiver via POST /api/robot/command/navigate.</p>
 
@@ -163,49 +163,49 @@ function ControlPage() {
                 </div>
               </div>
             </div>
-          </article>
 
-          <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <h2 className="text-lg font-semibold">Actions sécurité</h2>
-            <p className="mt-2 text-sm text-slate-400">Emergency stop est disponible pour admin et caregiver.</p>
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={() => void runCommand(() => triggerEmergencyStop('manual_ui_stop'), 'Emergency stop envoyé')}
-                className="inline-flex items-center justify-center rounded-2xl bg-rose-500 px-6 py-4 text-base font-bold text-white shadow-lg transition hover:bg-rose-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <OctagonX className="mr-2 h-6 w-6" /> EMERGENCY STOP
-              </button>
-
-              {isAdmin && (
+            <div className="mt-6 rounded-3xl border border-rose-400/20 bg-rose-500/10 p-5 text-white shadow-lg shadow-rose-950/10">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-semibold">Actions sécurité</h3>
+                  <p className="mt-1 text-sm text-rose-100/80">Emergency stop est disponible pour admin et caregiver.</p>
+                </div>
+                {isStatusLoading && <Loader2 className="h-4 w-4 animate-spin text-cyan-200" />}
+              </div>
+              <div className="mt-5 flex flex-wrap gap-3">
                 <button
                   type="button"
                   disabled={isSubmitting}
-                  onClick={() => void runCommand(resetEmergency, 'Emergency reset envoyé')}
-                  className="inline-flex items-center justify-center rounded-2xl border border-amber-400/30 bg-amber-400/10 px-5 py-3 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={() => void runCommand(() => triggerEmergencyStop('manual_ui_stop'), 'Emergency stop envoyé')}
+                  className="inline-flex items-center justify-center rounded-2xl bg-rose-500 px-6 py-4 text-base font-bold text-white shadow-lg transition hover:bg-rose-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <ShieldAlert className="mr-2 h-4 w-4" /> Reset emergency
+                  <OctagonX className="mr-2 h-6 w-6" /> EMERGENCY STOP
                 </button>
+
+                {isAdmin && (
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => void runCommand(resetEmergency, 'Emergency reset envoyé')}
+                    className="inline-flex items-center justify-center rounded-2xl border border-amber-400/30 bg-amber-400/10 px-5 py-3 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <ShieldAlert className="mr-2 h-4 w-4" /> Reset emergency
+                  </button>
+                )}
+              </div>
+
+              {!isAdmin && (
+                <p className="mt-4 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">
+                  Reset emergency est réservé aux administrateurs.
+                </p>
               )}
             </div>
           </article>
-
-          {!isAdmin && (
-            <article className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-slate-300 backdrop-blur">
-              Reset emergency est réservé aux administrateurs.
-            </article>
-          )}
-
-          <CameraFeed />
-
-          <RobotArmPanel isAdmin={isAdmin} />
-
-          <RobotSoundsPanel isAdmin={isAdmin} />
         </section>
 
         <aside className="space-y-4">
+          <CameraFeed />
+
           <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -228,22 +228,25 @@ function ControlPage() {
             </div>
           </article>
 
+          <RobotArmPanel isAdmin={isAdmin} />
+          <RobotSoundsPanel isAdmin={isAdmin} />
+
           <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <h2 className="text-base font-semibold">Local Telemetry Cache</h2>
+            <h2 className="text-base font-semibold">Cache télémétrie local</h2>
             <div className="mt-5 space-y-4">
               <MetricRow icon={Gauge} label="Speed" value={`${telemetry.speed.toFixed(2)} m/s`} />
               <MetricRow icon={Battery} label="Battery" value={`${Math.round(telemetry.battery)}%`} />
-              <MetricRow icon={Wifi} label="Backend status" value={`${Math.round(telemetry.connectionQuality)}%`} />
+              <MetricRow icon={Wifi} label="État du backend" value={`${Math.round(telemetry.connectionQuality)}%`} />
             </div>
           </article>
 
           <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <h2 className="text-base font-semibold">Current Status</h2>
+            <h2 className="text-base font-semibold">État actuel</h2>
             <div className={cn('mt-4 rounded-2xl p-4 text-center', status === 'idle' && 'bg-white/5', status === 'moving' && 'bg-cyan-400/10', status === 'charging' && 'bg-amber-400/10', status === 'delivering' && 'bg-emerald-400/10')}>
               <p className={cn('text-2xl font-bold capitalize', status === 'idle' && 'text-slate-300', status === 'moving' && 'text-cyan-200', status === 'charging' && 'text-amber-200', status === 'delivering' && 'text-emerald-200')}>
                 {backendStatus?.mode ?? status}
               </p>
-              <p className="mt-1 text-sm text-slate-400">{backendStatus?.battery_status ?? 'Backend polling'}</p>
+              <p className="mt-1 text-sm text-slate-400">{backendStatus?.battery_status ?? 'Interrogation du backend'}</p>
             </div>
           </article>
         </aside>

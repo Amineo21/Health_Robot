@@ -6,15 +6,15 @@ import { useAuth } from '@/contexts/AuthContext'
 import { canUseAdminControls } from '@/lib/permissions'
 
 const authenticatedLinks = [
-  { to: '/dashboard' as const, label: 'Dashboard', mobileLabel: 'Dashboard', icon: LayoutDashboard },
-  { to: '/control' as const, label: 'Control', mobileLabel: 'Robot Control', icon: Gamepad2 },
-  { to: '/map' as const, label: 'Map', mobileLabel: 'Live Map', icon: Map },
-  { to: '/status' as const, label: 'Status', mobileLabel: 'System Status', icon: Activity },
+  { to: '/dashboard' as const, label: 'Tableau de bord', mobileLabel: 'Tableau de bord', icon: LayoutDashboard },
+  { to: '/control' as const, label: 'Contrôle', mobileLabel: 'Contrôle du robot', icon: Gamepad2 },
+  { to: '/map' as const, label: 'Carte', mobileLabel: 'Carte en direct', icon: Map },
+  { to: '/status' as const, label: 'État', mobileLabel: 'État du système', icon: Activity },
 ]
 
 const adminLinks = [
-  { to: '/admin/users' as const, label: 'Users', mobileLabel: 'Users', icon: Users },
-  { to: '/settings' as const, label: 'Settings', mobileLabel: 'Settings', icon: Settings },
+  { to: '/admin/users' as const, label: 'Utilisateurs', mobileLabel: 'Utilisateurs', icon: Users },
+  { to: '/settings' as const, label: 'Paramètres', mobileLabel: 'Paramètres', icon: Settings },
 ]
 
 export default function Header() {
@@ -36,7 +36,7 @@ export default function Header() {
         <button
           onClick={() => setIsOpen(true)}
           className="btn-secondary h-10 w-10 p-0 lg:hidden"
-          aria-label="Open menu"
+          aria-label="Ouvrir le menu"
         >
           <Menu size={24} />
         </button>
@@ -51,7 +51,7 @@ export default function Header() {
 
         <nav className="ml-auto hidden items-center gap-1 md:flex">
           <Link to="/" className="nav-link px-3">
-            <Home size={18} /> <span className="hidden sm:inline">Home</span>
+            <Home size={18} /> <span className="hidden sm:inline">Accueil</span>
           </Link>
 
           {visibleLinks.map((item) => (
@@ -62,7 +62,7 @@ export default function Header() {
 
           {!isAuthenticated && (
             <Link to="/auth/login" className="nav-link px-3">
-              <LogIn size={18} /> <span className="hidden sm:inline">Login</span>
+              <LogIn size={18} /> <span className="hidden sm:inline">Connexion</span>
             </Link>
           )}
 
@@ -75,7 +75,7 @@ export default function Header() {
                 </p>
               </div>
               <button type="button" onClick={() => void handleLogout()} className="nav-link px-3">
-                <LogOut size={18} /> <span className="hidden sm:inline">Logout</span>
+                <LogOut size={18} /> <span className="hidden sm:inline">Déconnexion</span>
               </button>
             </div>
           )}
@@ -99,7 +99,7 @@ export default function Header() {
           <button
             onClick={() => setIsOpen(false)}
             className="btn-secondary h-10 w-10 p-0"
-            aria-label="Close menu"
+            aria-label="Fermer le menu"
           >
             <X size={24} />
           </button>
@@ -112,7 +112,7 @@ export default function Header() {
             className="nav-link"
             activeProps={{ className: 'nav-link-active' }}
           >
-            <Home size={18} /> <span>Home</span>
+            <Home size={18} /> <span>Accueil</span>
           </Link>
 
           {!isAuthenticated && (
@@ -122,7 +122,7 @@ export default function Header() {
               className="nav-link"
               activeProps={{ className: 'nav-link-active' }}
             >
-              <LogIn size={18} /> <span>Login</span>
+              <LogIn size={18} /> <span>Connexion</span>
             </Link>
           )}
 

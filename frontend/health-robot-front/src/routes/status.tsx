@@ -7,15 +7,15 @@ import { CAREGIVER_OR_ADMIN_ROLES } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
 const statusConfig: Record<ConnectionStatus, { icon: typeof CheckCircle; color: string; bg: string; label: string }> = {
-  connected: { icon: CheckCircle, color: 'text-emerald-200', bg: 'bg-emerald-400/10', label: 'Connected' },
-  disconnected: { icon: XCircle, color: 'text-rose-200', bg: 'bg-rose-400/10', label: 'Disconnected' },
-  connecting: { icon: Loader2, color: 'text-amber-200', bg: 'bg-amber-400/10', label: 'Connecting' },
+  connected: { icon: CheckCircle, color: 'text-emerald-200', bg: 'bg-emerald-400/10', label: 'Connecté' },
+  disconnected: { icon: XCircle, color: 'text-rose-200', bg: 'bg-rose-400/10', label: 'Déconnecté' },
+  connecting: { icon: Loader2, color: 'text-amber-200', bg: 'bg-amber-400/10', label: 'Connexion...' },
 }
 
 const connectionIcons: Record<string, typeof Wifi> = {
-  'Backend API': Server,
-  'Robot status': Bot,
-  'MQTT command bridge': Radio,
+  'API Backend': Server,
+  'État du robot': Bot,
+  'Pont MQTT': Radio,
 }
 
 export const Route = createFileRoute('/status')({ component: SystemStatusRoute })
@@ -29,11 +29,11 @@ function SystemStatusRoute() {
 }
 
 function formatLastPing(date?: Date): string {
-  if (!date) return 'Never'
+  if (!date) return 'Jamais'
   const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000)
-  if (seconds < 5) return 'Just now'
-  if (seconds < 60) return `${seconds}s ago`
-  return `${Math.floor(seconds / 60)}m ago`
+  if (seconds < 5) return 'À l\'instant'
+  if (seconds < 60) return `il y a ${seconds}s`
+  return `il y a ${Math.floor(seconds / 60)}m`
 }
 
 function formatValue(value: string | number | boolean | null | undefined, unit = '') {
@@ -79,7 +79,7 @@ function SystemStatusPage() {
   return (
     <div className="space-y-6 px-4 py-6 text-white sm:px-6 lg:px-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">System Status</h1>
+        <h1 className="text-2xl font-bold tracking-tight">État du système</h1>
         <p className="text-sm text-slate-400">Snapshot backend /api/robot/status avec polling toutes les 3 secondes</p>
       </div>
 

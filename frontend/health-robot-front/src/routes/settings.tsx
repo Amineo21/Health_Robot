@@ -76,7 +76,7 @@ function SettingsPage() {
   return (
     <div className="space-y-4 px-4 py-6 text-white sm:px-6 lg:px-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Paramètres</h1>
         <p className="text-sm text-slate-400">Configuration admin chargée depuis le backend</p>
       </div>
 
@@ -125,7 +125,7 @@ function SettingsPage() {
           </section>
 
           <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <h2 className="flex items-center gap-2 text-lg font-semibold"><Shield className="h-5 w-5" /> Safety Settings</h2>
+            <h2 className="flex items-center gap-2 text-lg font-semibold"><Shield className="h-5 w-5" /> Paramètres de sécurité</h2>
             <p className="mt-2 text-sm text-slate-400">Options de sécurité et de comportement côté backend.</p>
 
             <div className="mt-6 space-y-4 text-sm">

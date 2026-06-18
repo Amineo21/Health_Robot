@@ -151,7 +151,7 @@ export function RobotJoystick({ disabled = false, onTeleop }: RobotJoystickProps
         {isActive('left') && 'Turning Left'}
         {isActive('right') && 'Turning Right'}
         {disabled && 'Teleop reserved for admins'}
-        {!disabled && !direction && 'Ready for control'}
+        {!disabled && !direction && 'Prêt pour le contrôle'}
       </div>
     </div>
   )

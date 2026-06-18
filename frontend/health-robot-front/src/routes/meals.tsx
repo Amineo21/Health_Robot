@@ -9,16 +9,16 @@ import { CAREGIVER_OR_ADMIN_ROLES } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
 const mealSchedule = [
-  { id: 'breakfast', name: 'Breakfast', time: '07:30', status: 'completed' },
-  { id: 'lunch', name: 'Lunch', time: '12:00', status: 'in-progress' },
-  { id: 'snack', name: 'Afternoon Snack', time: '15:30', status: 'pending' },
-  { id: 'dinner', name: 'Dinner', time: '18:30', status: 'pending' },
+  { id: 'breakfast', name: 'Petit-déjeuner', time: '07:30', status: 'completed' },
+  { id: 'lunch', name: 'Déjeuner', time: '12:00', status: 'in-progress' },
+  { id: 'snack', name: 'Goûter', time: '15:30', status: 'pending' },
+  { id: 'dinner', name: 'Dîner', time: '18:30', status: 'pending' },
 ] as const
 
 const rooms = [
   { id: '101', resident: 'Marie D.', delivered: true },
   { id: '102', resident: 'Jean P.', delivered: true },
-  { id: '103', resident: 'Francoise M.', delivered: false },
+  { id: '103', resident: 'Françoise M.', delivered: false },
   { id: '201', resident: 'Pierre L.', delivered: false },
   { id: '202', resident: 'Simone B.', delivered: false },
   { id: '203', resident: 'Henri R.', delivered: false },
@@ -68,37 +68,37 @@ function MealsPage() {
   return (
     <div className="space-y-6 px-4 py-6 text-white sm:px-6 lg:px-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Meal Distribution</h1>
-        <p className="text-sm text-slate-400">Manage and track meal deliveries to residents</p>
+        <h1 className="text-2xl font-bold tracking-tight">Distribution des repas</h1>
+        <p className="text-sm text-slate-400">Gérer et suivre les livraisons de repas aux résidents</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <article className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-400">Meals Today</p>
+              <p className="text-sm text-slate-400">Repas aujourd'hui</p>
               <p className="mt-2 text-3xl font-black text-white">{completedMeals}</p>
             </div>
             <UtensilsCrossed className="h-5 w-5 text-cyan-200" />
           </div>
-          <p className="mt-2 text-xs text-slate-400">Deliveries completed</p>
+          <p className="mt-2 text-xs text-slate-400">Livraisons terminées</p>
         </article>
 
         <article className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-400">Current Meal</p>
-              <p className="mt-2 text-3xl font-black text-white">Lunch</p>
+              <p className="text-sm text-slate-400">Repas actuel</p>
+              <p className="mt-2 text-3xl font-black text-white">Déjeuner</p>
             </div>
             <Clock className="h-5 w-5 text-cyan-200" />
           </div>
-          <p className="mt-2 text-xs text-slate-400">Distribution in progress</p>
+          <p className="mt-2 text-xs text-slate-400">Distribution en cours</p>
         </article>
 
         <article className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-400">Residents Served</p>
+              <p className="text-sm text-slate-400">Résidents servis</p>
               <p className="mt-2 text-3xl font-black text-white">{deliveredCount}/{totalResidents}</p>
             </div>
             <Users className="h-5 w-5 text-cyan-200" />
@@ -111,19 +111,19 @@ function MealsPage() {
         <article className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-400">Success Rate</p>
+              <p className="text-sm text-slate-400">Taux de réussite</p>
               <p className="mt-2 text-3xl font-black text-emerald-200">100%</p>
             </div>
             <CheckCircle className="h-5 w-5 text-emerald-200" />
           </div>
-          <p className="mt-2 text-xs text-slate-400">On-time delivery</p>
+          <p className="mt-2 text-xs text-slate-400">Livraison à l'heure</p>
         </article>
       </div>
 
       <section className="grid gap-6 lg:grid-cols-2">
         <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-          <h2 className="text-lg font-semibold">Meal Schedule</h2>
-          <p className="mt-2 text-sm text-slate-400">Daily meal distribution times</p>
+          <h2 className="text-lg font-semibold">Planning des repas</h2>
+          <p className="mt-2 text-sm text-slate-400">Horaires de distribution quotidiens</p>
 
           <div className="mt-5 space-y-3">
             {mealSchedule.map((meal) => (
@@ -148,8 +148,8 @@ function MealsPage() {
         <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold">Room Deliveries</h2>
-              <p className="mt-2 text-sm text-slate-400">Select rooms for meal delivery</p>
+              <h2 className="text-lg font-semibold">Livraisons aux chambres</h2>
+              <p className="mt-2 text-sm text-slate-400">Sélectionner les chambres pour la livraison de repas</p>
             </div>
             <button
               type="button"
@@ -157,7 +157,7 @@ function MealsPage() {
               onClick={handleStartDelivery}
               className="rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Start Delivery ({selectedRooms.length})
+              Commencer la livraison ({selectedRooms.length})
             </button>
           </div>
 
