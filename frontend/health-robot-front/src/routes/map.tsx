@@ -3,7 +3,6 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Compass, HardDrive, Layers3, Loader2, MapPinned, Play, RefreshCw, Save, Trash2 } from 'lucide-react'
 
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
-import { RobotKeyboardTeleop } from '@/components/robot-keyboard-teleop'
 import { useAuth } from '@/contexts/AuthContext'
 import { ApiError } from '@/lib/api'
 import { canUseAdminControls, CAREGIVER_OR_ADMIN_ROLES } from '@/lib/permissions'
@@ -43,10 +42,6 @@ function MapPage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const isAdmin = canUseAdminControls(user)
-  const modeProgress = getModeStateText(modeState, 'progress')
-  const modeError = getModeStateText(modeState, 'error')
-  const modeLogTail = getModeStateText(modeState, 'log_tail')
-  const hasModeFailure = modeState?.ok === false || modeProgress === 'error' || Boolean(modeError)
 
   const refreshMaps = async () => {
     setIsLoading(true)
@@ -116,7 +111,7 @@ function MapPage() {
   }
 
   const handleLoadMap = (name: string) => {
-    if (!window.confirm(`Charger la map "${name}" en navigation ? Cela arrête le mapping manuel et démarre Nav2.`)) return
+    if (!window.confirm(`Charger la map "${name}" en navigation ?`)) return
     void runMapAction(() => loadSavedRobotMap(name), `Chargement de la map ${name} demandé`)
   }
 
@@ -171,20 +166,11 @@ function MapPage() {
             <h2 className="flex items-center gap-2 text-base font-semibold"><Compass className="h-4 w-4 text-cyan-200" /> Statut mapping</h2>
             <div className="mt-4 space-y-3 text-sm">
               <InfoRow label="Mode" value={String(modeState?.active ?? backendStatus?.mode ?? 'N/A')} />
-              <InfoRow label="Progress" value={modeProgress || 'idle'} />
+              <InfoRow label="Progress" value={String(modeState?.progress ?? 'idle')} />
               <InfoRow label="Pending" value={String(modeState?.pending ?? 'none')} />
               <InfoRow label="Robot pose" value={backendStatus?.pose ? `${backendStatus.pose.x.toFixed(2)}, ${backendStatus.pose.y.toFixed(2)}` : 'N/A'} />
             </div>
-            {hasModeFailure && (
-              <div className="mt-4 rounded-2xl border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-100">
-                <p className="font-semibold">Erreur robot</p>
-                <p className="mt-1 text-rose-100/90">{modeError || 'Le dashboard robot a signalé une erreur pendant le changement de mode.'}</p>
-                {modeLogTail && <pre className="mt-3 max-h-36 overflow-auto whitespace-pre-wrap rounded-xl bg-slate-950/70 p-3 font-mono text-[11px] text-rose-50/80">{modeLogTail}</pre>}
-              </div>
-            )}
           </article>
-
-          <RobotKeyboardTeleop isAdmin={isAdmin} />
 
           <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
             <h2 className="flex items-center gap-2 text-base font-semibold"><Save className="h-4 w-4 text-emerald-200" /> Construire une map</h2>
@@ -397,9 +383,4 @@ function formatTimestamp(value: number) {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Erreur map robot'
-}
-
-function getModeStateText(modeState: Record<string, unknown> | null, key: string) {
-  const value = modeState?.[key]
-  return typeof value === 'string' && value.trim().length > 0 ? value : ''
 }

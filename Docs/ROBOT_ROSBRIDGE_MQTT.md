@@ -36,10 +36,8 @@ Saved maps live inside the robot Docker container under `/root/maps`. The backen
 - `GET /api/robot/maps` proxies the robot dashboard map list from `/root/maps`.
 - `POST /api/robot/maps/mapping/start` switches the robot stack to mapping mode through the robot dashboard service.
 - `POST /api/robot/maps/save` saves the current SLAM map to `/root/maps/<name>` using `/slam_toolbox/save_map` and `/slam_toolbox/serialize_map` through rosbridge.
-- `POST /api/robot/maps/{name}/load` switches to saved-map navigation with `/root/maps/<name>.yaml`.
+- `POST /api/robot/maps/{name}/load` switches to navigation mode with `/root/maps/<name>.yaml`.
 - `DELETE /api/robot/maps/{name}` deletes the matching `.yaml`, `.pgm`, `.data`, and `.posegraph` files.
-
-The robot-side dashboard mode `mapping` runs manual SLAM with `slam_online.launch.py` (`slam_toolbox` + rosbridge on `9090`). Saved-map loading starts `navigation.launch.py` with Nav2/AMCL for the selected YAML map. Autonomous frontier exploration (`explore.launch.py` / `slam-nav`) remains intentionally disabled for now.
 
 ## Camera, Audio, And Arm
 

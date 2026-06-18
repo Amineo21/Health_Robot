@@ -31,9 +31,6 @@ class FakeBridge:
 
 
 class FakeDashboardClient:
-    def __init__(self) -> None:
-        self.loaded_map: str | None = None
-
     def list_maps(self) -> dict[str, Any]:
         return {"maps": [{"name": "demo", "parts": {"yaml": "demo.yaml", "pgm": "demo.pgm"}, "mtime": 1, "size": 10, "loadable": True}]}
 
@@ -44,7 +41,6 @@ class FakeDashboardClient:
         return {"ok": True, "active": mode, "map": map_path}
 
     def load_map(self, name: str) -> dict[str, Any]:
-        self.loaded_map = name
         return {"ok": True, "map": name}
 
     def delete_map(self, name: str) -> dict[str, Any]:
@@ -92,14 +88,3 @@ def test_caregiver_cannot_start_mapping(
     response = client.post("/api/robot/maps/mapping/start", headers=auth_headers(token))
 
     assert response.status_code == 403
-
-
-def test_load_saved_map_switches_to_navigation(client: TestClient, admin_token: str) -> None:
-    dashboard = FakeDashboardClient()
-    client.app.state.robot_dashboard_client = dashboard
-
-    response = client.post("/api/robot/maps/demo/load", headers=auth_headers(admin_token))
-
-    assert response.status_code == 200
-    assert response.json()["result"]["map"] == "demo"
-    assert dashboard.loaded_map == "demo"

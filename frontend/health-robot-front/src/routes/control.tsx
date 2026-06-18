@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { AlertTriangle, Battery, Camera, Crosshair, Gauge, Loader2, MapPinned, Music2, OctagonX, Play, RefreshCw, Send, ShieldAlert, SlidersHorizontal, Trash2, Upload, Video, Wifi } from 'lucide-react'
+import { AlertTriangle, Battery, Camera, Crosshair, Gauge, Loader2, MapPinned, Music2, OctagonX, Play, RefreshCw, RotateCcw, Send, ShieldAlert, SlidersHorizontal, Trash2, Upload, Video, Wifi } from 'lucide-react'
 
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { RobotJoystick } from '@/components/robot-joystick'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatMapCoordinate, mapCoordinatesToPercent, mapMetadataToBounds, screenPointToMapCoordinates, type ControlMapBounds } from '@/lib/control-map'
-import { commandRobotArm, deleteRobotSound, fetchRobotArmState, fetchRobotCameraSnapshot, fetchRobotSounds, navigateToPosition, playRobotSound, resetEmergency, triggerEmergencyStop, uploadRobotSound, type RobotMapMetadata, type RobotPose, type RobotSound } from '@/lib/robot-api'
+import { clearCostmaps, commandRobotArm, deleteRobotSound, fetchRobotArmState, fetchRobotCameraSnapshot, fetchRobotSounds, navigateToPosition, playRobotSound, resetEmergency, returnBase, sendTeleop, triggerEmergencyStop, uploadRobotSound, type RobotMapMetadata, type RobotPose, type RobotSound } from '@/lib/robot-api'
 import { useRobot } from '@/lib/robot-context'
 import { canUseAdminControls, CAREGIVER_OR_ADMIN_ROLES } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
@@ -192,9 +193,44 @@ function ControlPage() {
             </div>
           </article>
 
+          {isAdmin && (
+            <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+              <h2 className="text-lg font-semibold">Teleop admin</h2>
+              <p className="mt-2 text-sm text-slate-400">Joystick et commandes de récupération réservés au rôle admin.</p>
+
+              <div className="mt-8 flex flex-col items-center gap-6">
+                <RobotJoystick
+                  onTeleop={(payload) =>
+                    runCommand(() => sendTeleop(payload), 'Commande teleop envoyée')
+                  }
+                  disabled={isSubmitting}
+                />
+
+                <div className="flex flex-wrap justify-center gap-3">
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => void runCommand(returnBase, 'Retour base envoyé')}
+                    className="inline-flex items-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <RotateCcw className="mr-2 h-4 w-4" /> Return base
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => void runCommand(clearCostmaps, 'Clear costmaps envoyé')}
+                    className="inline-flex items-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Clear costmaps
+                  </button>
+                </div>
+              </div>
+            </article>
+          )}
+
           {!isAdmin && (
             <article className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-slate-300 backdrop-blur">
-              Reset emergency est réservé aux administrateurs.
+              Teleop, return-base, clear-costmaps et reset emergency sont réservés aux administrateurs.
             </article>
           )}
 

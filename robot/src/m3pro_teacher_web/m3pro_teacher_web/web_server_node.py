@@ -175,7 +175,7 @@ def play_sound_file(path: Path) -> bool:
 # =============================================================================
 
 LAUNCH_BY_MODE = {
-    "mapping":    "ros2 launch m3pro_teacher_nav slam_online.launch.py rviz:=false",
+    "mapping":    "ros2 launch m3pro_teacher_nav explore.launch.py",
     "navigation": "ros2 launch m3pro_teacher_nav navigation.launch.py map:={map} rviz:=false",
 }
 ROS_SETUP = (
@@ -192,6 +192,7 @@ MODE_FAILURE_PATTERNS = (
     re.compile(r"Failed processing YAML file"),
     re.compile(r"Failed to bring up all requested nodes"),
     re.compile(r"Caught exception in callback for transition"),
+    re.compile(r"Traceback \(most recent call last\):"),
 )
 
 # Exposed by /mode/status so the dashboard can poll the progress of an
@@ -291,13 +292,11 @@ def _normalize_map_arg(mode: str, map_path: str) -> str:
 
 def detect_active_mode() -> str:
     """Best-effort process-based mode detection for non-watchdog deployments."""
-    if _proc_exists("navigation.launch.py") or _proc_exists(r"/nav2_amcl/amcl"):
+    if _proc_exists("navigation.launch.py") or _proc_exists(r"/nav2_amcl/amcl") or _proc_exists(r"\bamcl\b"):
         return "navigation"
     if _proc_exists("localize.launch.py") or _proc_exists("localization_slam_toolbox_node"):
         return "navigation"
     if _proc_exists("explore.launch.py") or _proc_exists("explore_node"):
-        return "mapping"
-    if _proc_exists("manual_mapping.launch.py") or _proc_exists("slam_online.launch.py"):
         return "mapping"
     if _proc_exists("slam_and_nav.launch.py") or _proc_exists("async_slam_toolbox_node"):
         return "mapping"
@@ -323,10 +322,10 @@ def switch_mode(mode: str, map_path: str, logger) -> dict:
         _status_update(pending=mode, progress="killing existing mode launch",
                        ok=True, error=None, started_at=int(time.time()),
                        finished_at=0, log_tail="")
-        # Kill any previous mapping/navigation/explore launch parents
+        # Kill any explore.launch.py / localize.launch.py (ros2 launch parents)
         # plus common stuck children.
         kill_patterns = [
-            "slam_online.launch.py", "manual_mapping.launch.py", "explore.launch.py", "localize.launch.py",
+            "explore.launch.py", "localize.launch.py",
             "slam_and_nav.launch.py", "navigation.launch.py",
             "async_slam_toolbox_node", "localization_slam_toolbox_node",
             "controller_server", "planner_server", "smoother_server",

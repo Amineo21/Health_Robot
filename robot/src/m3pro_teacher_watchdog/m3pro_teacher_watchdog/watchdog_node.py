@@ -11,22 +11,28 @@ service up/down state and restart counts.
 Exposes a small control surface:
 
   topic   /teacher/watchdog/status          (std_msgs/String, JSON)
-  service /teacher/watchdog/set_mode        (legacy; prefer mode_cmd)
+  service /teacher/watchdog/set_mode        (std_srvs/SetBool trick:
+                                             data=True  means explore,
+                                             data=False means navigation — but
+                                             we actually accept arbitrary
+                                             mode strings via a std_msgs/String
+                                             on /teacher/watchdog/mode_cmd for
+                                             finer control.)
   topic   /teacher/watchdog/mode_cmd        (std_msgs/String; publish
-                                             "mapping"
+                                             "explore" / "navigation" / "slam-nav"
                                              to switch, or "restart:<service>"
                                              to force-restart just one service.)
 
 Status JSON shape:
 
   {
-    "mode":          "mapping",
-    "mode_requested": null,
+    "mode":          "explore",
+    "mode_requested": null,          // or "navigation" while a switch is pending
     "services": {
       "bringup":   {"alive": true,  "pid": 123, "restarts": 0, "last_restart": 0},
       "camera":    {"alive": false, "pid": null, "restarts": 3, "last_restart": 1776..},
       "mode":      {"alive": true,  "pid": 234, "restarts": 0, "last_restart": 0,
-                    "cmd": "ros2 launch m3pro_teacher_nav slam_online.launch.py rviz:=false"},
+                    "cmd": "ros2 launch m3pro_teacher_nav explore.launch.py"},
       "dashboard": {"alive": true,  "pid": 456, "restarts": 0, "last_restart": 0}
     },
     "uptime_s": 482
@@ -69,10 +75,15 @@ ROS_SETUP = (
 
 def mode_cmd_for(mode: str) -> str:
     """Return the ros2 launch command for a given mode."""
-    return "ros2 launch m3pro_teacher_nav slam_online.launch.py rviz:=false"
+    if mode == "navigation":
+        return f"ros2 launch m3pro_teacher_nav localize.launch.py map:={shlex.quote(f'{MAPS_DIR}/{MAP_NAME}')}"
+    if mode == "slam-nav":
+        return "ros2 launch m3pro_teacher_nav slam_and_nav.launch.py rviz:=false"
+    # default
+    return "ros2 launch m3pro_teacher_nav explore.launch.py"
 
 
-VALID_MODES = {"mapping"}
+VALID_MODES = {"explore", "navigation", "slam-nav"}
 
 # Children that sometimes escape `ros2 launch`'s process-group cleanup —
 # we force-kill them by name on a mode switch. Other services are owned by
@@ -116,7 +127,7 @@ class Watchdog(Node):
         super().__init__("m3pro_watchdog")
         self.started = time.time()
         self._svcs: Dict[str, Service] = {}
-        self.mode: str = "mapping"
+        self.mode: str = "explore"
         self.mode_requested: Optional[str] = None
 
         self.status_pub = self.create_publisher(String, "/teacher/watchdog/status", 10)

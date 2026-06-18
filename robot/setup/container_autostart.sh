@@ -56,7 +56,7 @@ spawn_once bringup ros2 launch M3Pro_navigation base_bringup.launch.py
 sleep 5
 spawn_once camera ros2 launch slam_mapping app_camera.launch.py
 sleep 3
-spawn_once mode ros2 launch m3pro_teacher_nav slam_online.launch.py rviz:=false
+spawn_once mode ros2 launch m3pro_teacher_nav explore.launch.py
 sleep 3
 spawn_once dashboard ros2 launch m3pro_teacher_web web_dashboard.launch.py rosbridge:=false port:=8080
 

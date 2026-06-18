@@ -1,25 +1,17 @@
 from __future__ import annotations
 
 import math
-import time
 
 import pytest
 
 from app.domain.entities.mqtt_topics import ROBOT_BATTERY_TOPIC, ROBOT_NAV2_PATH_TOPIC, ROBOT_STATUS_TOPIC
 from app.infrastructure.rosbridge.mqtt_rosbridge_bridge import (
-    MqttRosbridgeBridge,
     build_goal_pose_message,
     build_twist_message,
     parse_mqtt_command_payload,
     telemetry_payload_from_ros_message,
     voltage_to_percent,
 )
-
-
-class MinimalSettings:
-    robot_rosbridge_client_id = "test-rosbridge"
-    mqtt_username = None
-    mqtt_password = None
 
 
 def test_parse_mqtt_command_payload_uses_nested_backend_payload() -> None:
@@ -53,24 +45,6 @@ def test_build_twist_message_matches_cmd_vel_shape() -> None:
         "linear": {"x": 0.2, "y": 0, "z": 0},
         "angular": {"x": 0, "y": 0, "z": -0.5},
     }
-
-
-def test_repeated_teleop_commands_keep_only_latest_stop_timer(monkeypatch: pytest.MonkeyPatch) -> None:
-    bridge = MqttRosbridgeBridge(settings=MinimalSettings())  # type: ignore[arg-type]
-    zero_burst_count = 0
-
-    def fake_zero_burst() -> None:
-        nonlocal zero_burst_count
-        zero_burst_count += 1
-
-    monkeypatch.setattr(bridge, "_publish_zero_twist_burst", fake_zero_burst)
-
-    bridge._schedule_zero_twist(0.05)
-    bridge._schedule_zero_twist(0.08)
-    time.sleep(0.13)
-
-    assert zero_burst_count == 1
-    bridge.stop()
 
 
 def test_voltage_to_percent_matches_m3pro_dashboard_formula() -> None:
