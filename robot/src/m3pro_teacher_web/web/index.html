@@ -109,7 +109,7 @@
   <span id="mode-tag" class="tag mode">MODE: —</span>
   <span id="watchdog-tag" class="tag mode" title="Per-service health from m3pro_teacher_watchdog">svc: —</span>
   <button class="btn-green" style="padding:4px 10px;font-size:11px;" onclick="switchMode('mapping')"
-          title="Start MAPPING mode (SLAM + Nav2 + explore_lite). Builds a new map.">🗺️ Map</button>
+          title="Start manual MAPPING mode (SLAM + rosbridge). Use teleop to build the map.">🗺️ Map</button>
   <button class="btn-blue" style="padding:4px 10px;font-size:11px;" onclick="switchMode('navigation')"
           title="Start NAVIGATION mode (AMCL on a saved map). Enables /initialpose.">🧭 Navigate</button>
   <button class="btn-yellow" style="padding:4px 10px;font-size:11px;" onclick="resetSlam()"
@@ -148,7 +148,7 @@
     <div class="panel-body flush" style="position:relative;">
       <canvas id="viewer3d"></canvas>
       <div id="teleop-help">
-        TELEOP <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to drive &nbsp;·&nbsp; <kbd>SPACE</kbd> stop &nbsp;·&nbsp; <kbd>ESC</kbd> exit
+        TELEOP <kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> to drive &nbsp;·&nbsp; <kbd>SPACE</kbd> stop &nbsp;·&nbsp; <kbd>ESC</kbd> exit
       </div>
     </div>
   </section>
@@ -255,13 +255,13 @@
       <div class="panel-head"><span>Controls</span></div>
       <div class="panel-body">
         <div class="btn-row" style="margin-bottom:6px;">
-          <button class="btn-green" id="btn-explore" onclick="toggleExplore()">▶ Explore</button>
+          <button class="btn-green" id="btn-explore" onclick="toggleExplore()" style="display:none;">▶ Explore</button>
           <button class="btn-blue" onclick="comeHome()">🏠 Come Home</button>
           <button class="btn-purple" id="btn-teleop" onclick="toggleTeleop()">⌨ Teleop</button>
         </div>
         <div class="btn-row">
           <button class="btn-yellow" onclick="saveMap()">💾 Save Map</button>
-          <button class="btn-gray" id="btn-config" onclick="openConfig()">⚙ Configure</button>
+          <button class="btn-gray" id="btn-config" onclick="openConfig()" style="display:none;">⚙ Configure</button>
           <button class="btn-red" onclick="abort()">■ Abort</button>
         </div>
         <div class="btn-row" style="margin-top:6px;grid-template-columns:1fr 1fr 1fr;">
@@ -981,7 +981,7 @@ window.clearCostmaps = clearCostmaps;
 
 // ==== TELEOP ================================================================
 let teleopOn = false;
-const keyState = { w:false, s:false, a:false, d:false, ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false, ' ':false };
+const keyState = { z:false, q:false, w:false, s:false, a:false, d:false, ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false, ' ':false };
 let teleopTimer = null;
 let maxLin = 0.20;
 const maxAng = 0.8;
@@ -1006,9 +1006,9 @@ window.toggleTeleop = toggleTeleop;
 
 function publishTeleop() {
   let lx = 0, az = 0;
-  if (keyState.w || keyState.ArrowUp)    lx += maxLin;
+  if (keyState.z || keyState.w || keyState.ArrowUp) lx += maxLin;
   if (keyState.s || keyState.ArrowDown)  lx -= maxLin;
-  if (keyState.a || keyState.ArrowLeft)  az += maxAng;
+  if (keyState.q || keyState.a || keyState.ArrowLeft) az += maxAng;
   if (keyState.d || keyState.ArrowRight) az -= maxAng;
   if (keyState[' ']) { lx = 0; az = 0; }
   cmdVelPub.publish(new ROSLIB.Message({
@@ -1446,10 +1446,10 @@ async function refreshModeState() {
   } catch (_) {}
 }
 
-// "Reset SLAM" = restart into whichever mode we're currently in.
+// "Reset SLAM" = restart the manual mapping stack.
 function resetSlam() {
-  const target = currentMode === 'navigation' ? 'navigation' : 'mapping';
-  if (!confirm(`Reset SLAM by restarting in ${target.toUpperCase()} mode?`)) return;
+  const target = 'mapping';
+  if (!confirm('Reset SLAM by restarting manual MAPPING mode?')) return;
   fetch('/mode/switch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

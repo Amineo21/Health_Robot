@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { setAccessToken } from './api'
-import { commandRobotArm, fetchCurrentRobotMap, fetchRobotCameraSnapshot, navigateToPosition, saveCurrentRobotMap, sendTeleop, uploadRobotSound } from './robot-api'
+import { commandRobotArm, fetchCurrentRobotMap, fetchRobotCameraSnapshot, loadSavedRobotMap, navigateToPosition, saveCurrentRobotMap, sendTeleop, uploadRobotSound } from './robot-api'
 
 const fetchMock = vi.fn()
 
@@ -59,6 +59,16 @@ describe('robot-api', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:4000/api/robot/maps/save')
     expect(init.method).toBe('POST')
     expect(JSON.parse(init.body as string)).toEqual({ name: 'map_1' })
+  })
+
+  it('loads saved maps through backend', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true, result: { map: 'map_1' } }))
+
+    await loadSavedRobotMap('map_1')
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:4000/api/robot/maps/map_1/load')
+    expect(init.method).toBe('POST')
   })
 
   it('fetches camera snapshots with bearer auth', async () => {
