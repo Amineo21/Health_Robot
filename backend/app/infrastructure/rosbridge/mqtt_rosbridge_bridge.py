@@ -423,7 +423,7 @@ class MqttRosbridgeBridge:
         if len(joints) != 6:
             raise ValueError("six arm joints are required")
         bounded = [max(0, min(180, int(value))) for value in joints]
-        sent = self._send_rosbridge(
+        self._send_rosbridge(
             {
                 "op": "publish",
                 "topic": "/arm6_joints",
@@ -438,8 +438,6 @@ class MqttRosbridgeBridge:
                 },
             }
         )
-        if not sent:
-            raise ConnectionError("rosbridge WebSocket non connecte, commande bras non envoyee")
         with self._latest_arm_lock:
             self._latest_arm_joints = bounded
 
