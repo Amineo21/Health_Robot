@@ -37,15 +37,24 @@ services:
       - "4000:4000"
     environment:
       - MQTT_BROKER=mqtt://mosquitto:1883
+      - MQTT_ENABLED=true
       - MQTT_HOST=mosquitto
       - MQTT_PORT=1883
+      - ROBOT_ROSBRIDGE_ENABLED=${ROBOT_ROSBRIDGE_ENABLED:-true}
+      - ROBOT_ROSBRIDGE_URL=${ROBOT_ROSBRIDGE_URL:-ws://10.10.220.180:9090}
+      - ROBOT_DASHBOARD_URL=${ROBOT_DASHBOARD_URL:-http://10.10.220.180:8080}
+      - ROBOT_MAPS_DIRECTORY=${ROBOT_MAPS_DIRECTORY:-/root/maps}
+      - ROBOT_BASE_X=${ROBOT_BASE_X:-0.0}
+      - ROBOT_BASE_Y=${ROBOT_BASE_Y:-0.0}
+      - ROBOT_BASE_YAW=${ROBOT_BASE_YAW:-0.0}
+      - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       - DATABASE_URL=mysql+pymysql://${MYSQL_USER:-health_robot}:${MYSQL_PASSWORD:-health_robot}@mysql:3306/${MYSQL_DATABASE:-health_robot}?charset=utf8mb4
       - USER_REPOSITORY_BACKEND=database
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-secret-change-me}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-in-production}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
       - INITIAL_ADMIN_EMAIL=${INITIAL_ADMIN_EMAIL:-admin@health-robot.local}
-      - INITIAL_ADMIN_PASSWORD=${INITIAL_ADMIN_PASSWORD:-admin}
+      - INITIAL_ADMIN_PASSWORD=${INITIAL_ADMIN_PASSWORD:-change-me-in-production}
       - INITIAL_ADMIN_NAME=${INITIAL_ADMIN_NAME:-Admin}
     depends_on:
       mosquitto:
@@ -57,9 +66,13 @@ services:
   frontend:
     build:
       context: ../frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:4000}
     container_name: robot_frontend
     ports:
       - "3000:3000"
+    environment:
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:4000}
     depends_on:
       - backend
     restart: unless-stopped

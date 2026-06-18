@@ -25,19 +25,24 @@ class MQTTService:
         self._client.on_connect = self._handle_connect
         self._client.on_message = self._handle_message
         self._client.on_disconnect = self._handle_disconnect
+        self._client.reconnect_delay_set(min_delay=1, max_delay=30)
 
     def set_message_handler(self, on_message: MessageHandler) -> None:
         self._on_message = on_message
 
     def start(self) -> None:
+        if not self._settings.mqtt_enabled:
+            logger.info("MQTT desactive par configuration")
+            return
+
         try:
-            self._client.connect(
+            self._client.connect_async(
                 self._settings.mqtt_host,
                 self._settings.mqtt_port,
                 self._settings.mqtt_keepalive,
             )
             self._client.loop_start()
-            logger.info("MQTT connecte sur %s:%s", self._settings.mqtt_host, self._settings.mqtt_port)
+            logger.info("Boucle MQTT demarree vers %s:%s", self._settings.mqtt_host, self._settings.mqtt_port)
         except OSError as exc:
             logger.warning("MQTT indisponible au demarrage: %s", exc)
 
@@ -46,9 +51,12 @@ class MQTTService:
         try:
             self._client.disconnect()
         except OSError:
-            logger.debug("Deconnexion MQTT ignoree car le client etait deja hors ligne")
+            pass
 
     def publish_json(self, topic: str, payload: dict[str, Any], qos: int = 1, retain: bool = False) -> None:
+        if not self._settings.mqtt_enabled:
+            return
+
         result = self._client.publish(topic, json.dumps(payload), qos=qos, retain=retain)
         if result.rc != mqtt.MQTT_ERR_SUCCESS:
             logger.warning("Echec de publication MQTT sur le topic %s avec le code %s", topic, result.rc)

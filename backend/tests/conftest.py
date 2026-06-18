@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Callable, Generator
 from itertools import count
 
 import pytest
 from fastapi.testclient import TestClient
+
+os.environ.setdefault("MQTT_ENABLED", "false")
 
 from app.main import create_app
 from tests.helpers import ADMIN_EMAIL, ADMIN_PASSWORD, CAREGIVER_PASSWORD, auth_headers, login

@@ -1,12 +1,27 @@
+import React, { Suspense } from 'react'
 import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
-import { TanStackDevtools } from '@tanstack/react-devtools'
 
 import Header from '../components/Header'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { RobotProvider } from '@/lib/robot-context'
 
 import appCss from '../styles.css?url'
+
+const Devtools = import.meta.env.DEV
+  ? React.lazy(() =>
+      import('@tanstack/react-devtools').then((m) => ({
+        default: m.TanStackDevtools,
+      })),
+    )
+  : null
+
+const RouterDevtoolsPanel = import.meta.env.DEV
+  ? React.lazy(() =>
+      import('@tanstack/react-router-devtools').then((m) => ({
+        default: m.TanStackRouterDevtoolsPanel,
+      })),
+    )
+  : null
 
 export const Route = createRootRoute({
   head: () => ({
@@ -19,7 +34,7 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'Health Robot Front',
+        title: 'CareBot - Contrôle de Robot',
       },
     ],
     links: [
@@ -34,7 +49,7 @@ export const Route = createRootRoute({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="fr">
       <head>
         <HeadContent />
       </head>
@@ -45,17 +60,14 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             {children}
           </RobotProvider>
         </AuthProvider>
-        <TanStackDevtools
-          config={{
-            position: 'bottom-right',
-          }}
-          plugins={[
-            {
-              name: 'Tanstack Router',
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-          ]}
-        />
+        {Devtools && (
+          <Suspense fallback={null}>
+            <Devtools
+              config={{ position: 'bottom-right' }}
+              plugins={RouterDevtoolsPanel ? [{ name: 'Tanstack Router', render: <RouterDevtoolsPanel /> }] : []}
+            />
+          </Suspense>
+        )}
         <Scripts />
       </body>
     </html>

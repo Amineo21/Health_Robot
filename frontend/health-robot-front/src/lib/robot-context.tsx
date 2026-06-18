@@ -2,6 +2,9 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 
+import { useAuth } from '@/contexts/AuthContext'
+import { fetchRobotStatus, sendTeleop, triggerEmergencyStop, type RobotStatusSnapshot } from './robot-api'
+
 export type RobotStatus = 'idle' | 'moving' | 'charging' | 'delivering'
 export type MissionType = 'medical' | 'meal'
 export type MissionStatus = 'pending' | 'in-progress' | 'completed' | 'cancelled'
@@ -45,6 +48,9 @@ export interface SystemConnection {
 
 interface RobotContextType {
   status: RobotStatus
+  backendStatus: RobotStatusSnapshot | null
+  isStatusLoading: boolean
+  statusError: string | null
   telemetry: RobotTelemetry
   missions: Mission[]
   activeMission: Mission | null
@@ -88,7 +94,10 @@ function backendModeToStatus(mode: string): RobotStatus {
 }
 
 export function RobotProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<RobotStatus>('idle')
+  const { isAuthenticated } = useAuth()
+  const [backendStatus, setBackendStatus] = useState<RobotStatusSnapshot | null>(null)
+  const [isStatusLoading, setIsStatusLoading] = useState(false)
+  const [statusError, setStatusError] = useState<string | null>(null)
   const [telemetry, setTelemetry] = useState<RobotTelemetry>({
     position: { x: 0, y: 0, floor: 1 },
     speed: 0,
@@ -280,6 +289,9 @@ export function RobotProvider({ children }: { children: ReactNode }) {
     <RobotContext.Provider
       value={{
         status,
+        backendStatus,
+        isStatusLoading,
+        statusError,
         telemetry,
         missions,
         activeMission,

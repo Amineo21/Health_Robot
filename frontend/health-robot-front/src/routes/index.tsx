@@ -18,10 +18,10 @@ function Home() {
               CareBot Control
             </div>
             <h1 className="max-w-xl text-5xl sm:text-6xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-cyan-200 via-cyan-300 to-white leading-tight">
-              Une base unique pour piloter le robot et l'équipe.
+              Une plate-forme unique pour piloter le robot et l'équipe.
             </h1>
             <p className="mt-6 max-w-lg text-lg leading-relaxed text-slate-300 font-light">
-              Le front a été porté sur <span className="text-cyan-300 font-semibold">TanStack Start</span>. Accédez au dashboard, connectez-vous et explorez les pages de supervision adaptées à ce projet.
+              Le front a été construit avec <span className="text-cyan-300 font-semibold">TanStack Start</span>. Accédez au tableau de bord, connectez-vous et explorez les pages de supervision adaptées à ce projet.
             </p>
 
             <div className="mt-10 flex flex-col sm:flex-row gap-4">
@@ -31,7 +31,7 @@ function Home() {
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-cyan-300 to-cyan-200 opacity-0 group-hover/btn:opacity-100 transition-opacity duration-300"></div>
                 <span className="relative flex items-center justify-center gap-2">
-                  Ouvrir le dashboard
+                  Ouvrir le tableau de bord
                   <svg className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                   </svg>

@@ -21,11 +21,11 @@ function SignupPage() {
   }, [isAuthenticated, isLoading, navigate])
 
   return (
-    <AuthShell
-      eyebrow="Création de compte"
-      title="Créer un accès pour l'équipe"
-      description="Ajoute un profil soignant ou manager pour commencer à utiliser l'espace de contrôle."
-    >
+      <AuthShell
+        eyebrow="Création de compte"
+        title="Création uniquement par admin"
+        description="Il n'y a pas d'inscription publique. Les administrateurs gèrent les comptes depuis l'espace admin."
+      >
       <SignupForm />
     </AuthShell>
   )

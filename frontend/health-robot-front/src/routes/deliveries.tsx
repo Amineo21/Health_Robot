@@ -1,10 +1,20 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { CheckCircle, Clock, Package, Truck } from 'lucide-react'
 
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { useRobot } from '@/lib/robot-context'
+import { CAREGIVER_OR_ADMIN_ROLES } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
-export const Route = createFileRoute('/deliveries')({ component: DeliveriesPage })
+export const Route = createFileRoute('/deliveries')({ component: DeliveriesRoute })
+
+function DeliveriesRoute() {
+  return (
+    <ProtectedRoute allowedRoles={CAREGIVER_OR_ADMIN_ROLES}>
+      <DeliveriesPage />
+    </ProtectedRoute>
+  )
+}
 
 function DeliveriesPage() {
   const { missions, deliveriesToday } = useRobot()
@@ -14,17 +24,17 @@ function DeliveriesPage() {
   const mealDeliveries = completedMissions.filter((mission) => mission.type === 'meal')
 
   const stats = [
-    { title: 'Total Deliveries', value: deliveriesToday, icon: Truck, color: 'text-cyan-200', bg: 'bg-cyan-400/10' },
-    { title: 'Medical Deliveries', value: medicalDeliveries.length, icon: Package, color: 'text-cyan-200', bg: 'bg-cyan-400/10' },
-    { title: 'Meal Deliveries', value: mealDeliveries.length, icon: Clock, color: 'text-emerald-200', bg: 'bg-emerald-400/10' },
-    { title: 'Success Rate', value: '100%', icon: CheckCircle, color: 'text-emerald-200', bg: 'bg-emerald-400/10' },
+    { title: 'Livraisons totales', value: deliveriesToday, icon: Truck, color: 'text-cyan-200', bg: 'bg-cyan-400/10' },
+    { title: 'Livraisons médicales', value: medicalDeliveries.length, icon: Package, color: 'text-cyan-200', bg: 'bg-cyan-400/10' },
+    { title: 'Livraisons de repas', value: mealDeliveries.length, icon: Clock, color: 'text-emerald-200', bg: 'bg-emerald-400/10' },
+    { title: 'Taux de réussite', value: '100%', icon: CheckCircle, color: 'text-emerald-200', bg: 'bg-emerald-400/10' },
   ]
 
   return (
     <div className="space-y-4 px-4 py-6 text-white sm:px-6 lg:px-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Deliveries</h1>
-        <p className="text-sm text-slate-400">Track all medical equipment and supply deliveries</p>
+        <h1 className="text-2xl font-bold tracking-tight">Livraisons</h1>
+        <p className="text-sm text-slate-400">Suivre toutes les livraisons d'équipements médicaux et de fournitures</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -44,13 +54,13 @@ function DeliveriesPage() {
       </div>
 
       <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-        <h2 className="text-lg font-semibold">Recent Deliveries</h2>
-        <p className="mt-2 text-sm text-slate-400">Completed delivery history</p>
+        <h2 className="text-lg font-semibold">Livraisons récentes</h2>
+        <p className="mt-2 text-sm text-slate-400">Historique des livraisons terminées</p>
 
         <div className="mt-5 space-y-3">
           {completedMissions.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-6 text-center text-slate-400">
-              No completed deliveries yet
+              Aucune livraison terminée pour le moment
             </div>
           ) : (
             completedMissions.map((mission) => (
@@ -61,11 +71,11 @@ function DeliveriesPage() {
                   </div>
                   <div>
                     <p className="font-medium text-white">{mission.destination}</p>
-                    <p className="text-sm text-slate-400 capitalize">{mission.type} delivery</p>
+                    <p className="text-sm text-slate-400 capitalize">{mission.type === 'medical' ? 'Livraison médicale' : 'Livraison de repas'}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="inline-flex rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-200">Completed</span>
+                  <span className="inline-flex rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-200">Terminée</span>
                   <p className="mt-1 text-xs text-slate-500">{mission.startTime.toLocaleTimeString()}</p>
                 </div>
               </div>

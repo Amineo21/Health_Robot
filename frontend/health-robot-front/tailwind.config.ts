@@ -85,7 +85,7 @@ const config = {
     },
   },
   plugins: [
-    plugin(function ({ addComponents, theme }) {
+    plugin(function ({ addComponents }) {
       addComponents({
         // Card components
         '.card-base': {

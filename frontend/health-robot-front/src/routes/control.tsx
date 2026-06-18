@@ -4,11 +4,30 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Battery, Bot, Gauge, OctagonX, Video, Wifi } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 
-import { RobotJoystick } from '@/components/robot-joystick'
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { useAuth } from '@/contexts/AuthContext'
+import { formatMapCoordinate, mapCoordinatesToPercent, mapMetadataToBounds, screenPointToMapCoordinates, type ControlMapBounds } from '@/lib/control-map'
+import { commandRobotArm, deleteRobotSound, fetchRobotArmState, fetchRobotCameraSnapshot, fetchRobotSounds, navigateToPosition, playRobotSound, resetEmergency, triggerEmergencyStop, uploadRobotSound, type RobotMapMetadata, type RobotPose, type RobotSound } from '@/lib/robot-api'
 import { useRobot } from '@/lib/robot-context'
+import { canUseAdminControls, CAREGIVER_OR_ADMIN_ROLES } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
-export const Route = createFileRoute('/control')({ component: ControlPage })
+export const Route = createFileRoute('/control')({ component: ControlRoute })
+
+const DEFAULT_ARM_JOINTS = [90, 90, 90, 90, 90, 90]
+const ARM_PRESETS = [
+  { name: 'Centre', joints: [90, 90, 90, 90, 90, 90] },
+  { name: 'Caméra avant', joints: [90, 60, 45, 90, 90, 90] },
+  { name: 'Caméra haut', joints: [90, 30, 60, 90, 90, 90] },
+]
+
+function ControlRoute() {
+  return (
+    <ProtectedRoute allowedRoles={CAREGIVER_OR_ADMIN_ROLES}>
+      <ControlPage />
+    </ProtectedRoute>
+  )
+}
 
 const CAMERA_URL = (import.meta.env.VITE_CAMERA_URL ?? 'http://10.10.220.180:8080') as string
 
@@ -107,7 +126,6 @@ function ControlPage() {
                 ARRÊT D'URGENCE
               </button>
             </div>
-          </article>
 
           {/* Télémétrie */}
           <article className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
@@ -137,6 +155,7 @@ function ControlPage() {
                   <div className="h-full rounded-full bg-cyan-400 transition-all" style={{ width: `${Math.min(100, telemetry.speed * 100)}%` }} />
                 </div>
               </div>
+            )}
 
               <div>
                 <div className="mb-2 flex items-center justify-between">

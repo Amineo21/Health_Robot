@@ -18,6 +18,8 @@ dist/
 téléchargements/
 .œufs/
 lib/
+!frontend/health-robot-front/src/lib/
+!frontend/health-robot-front/src/lib/**
 lib64/
 parties/
 sdist/

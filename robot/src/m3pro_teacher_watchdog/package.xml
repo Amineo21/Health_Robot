@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>m3pro_teacher_watchdog</name>
+  <version>0.1.0</version>
+  <description>Supervisor for the M3 Pro launch stack. Spawns, monitors, and
+    relaunches bringup / camera / mode-stack (explore|navigation|slam-nav) /
+    web dashboard. Publishes per-service status on /teacher/watchdog/status so
+    the dashboard can show which launches are alive and their restart counts.
+    Exposes a set_mode service for on-the-fly switching between mapping and
+    navigation modes.</description>
+  <maintainer email="teacher@example.com">Teacher</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>std_srvs</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

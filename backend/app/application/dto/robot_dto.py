@@ -73,6 +73,52 @@ class NavigationEtaTelemetry(DomainDto):
         return cls.model_validate(asdict(telemetry))
 
 
+class RobotPose(DomainDto):
+    x: float
+    y: float
+    yaw: float | None = None
+
+    def to_domain(self) -> domain.RobotPose:
+        return domain.RobotPose(**self.model_dump())
+
+    @classmethod
+    def from_domain(cls, pose: domain.RobotPose) -> Self:
+        return cls.model_validate(asdict(pose))
+
+
+class RobotMapMetadata(DomainDto):
+    width: int = Field(ge=1)
+    height: int = Field(ge=1)
+    resolution: float = Field(gt=0)
+    origin_x: float = 0.0
+    origin_y: float = 0.0
+
+    def to_domain(self) -> domain.RobotMapMetadata:
+        return domain.RobotMapMetadata(**self.model_dump())
+
+    @classmethod
+    def from_domain(cls, map_metadata: domain.RobotMapMetadata) -> Self:
+        return cls.model_validate(asdict(map_metadata))
+
+
+class RobotRuntimeTelemetry(DomainDto):
+    mode: domain.RobotMode | None = None
+    battery_level: int | None = Field(default=None, ge=0, le=100)
+    emergency_active: bool | None = None
+    pose: RobotPose | None = None
+    map: RobotMapMetadata | None = None
+    min_obstacle_distance_m: float | None = Field(default=None, ge=0)
+    current_speed_mps: float | None = Field(default=None, ge=0)
+
+    def to_domain(self) -> domain.RobotRuntimeTelemetry:
+        payload = self.model_dump()
+        if self.pose is not None:
+            payload["pose"] = self.pose.to_domain()
+        if self.map is not None:
+            payload["map"] = self.map.to_domain()
+        return domain.RobotRuntimeTelemetry(**payload)
+
+
 class EmergencyStopRequest(DomainDto):
     source: domain.EmergencySource
     reason: str = Field(min_length=3, max_length=300)
@@ -109,6 +155,9 @@ class RobotStatus(DomainDto):
     path_distance_m: float | None = Field(default=None, ge=0)
     distance_remaining_m: float | None = Field(default=None, ge=0)
     current_speed_mps: float | None = Field(default=None, ge=0)
+    pose: RobotPose | None = None
+    map: RobotMapMetadata | None = None
+    min_obstacle_distance_m: float | None = Field(default=None, ge=0)
     last_battery_event: BatteryEvent | None = None
     last_emergency_event: EmergencyEvent | None = None
 

@@ -29,7 +29,7 @@ export function LoginForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-2">
-          Email
+          E-mail
         </label>
         <input
           id="email"
@@ -72,10 +72,7 @@ export function LoginForm() {
       </button>
 
       <div className="pt-4 border-t border-white/10 text-center text-sm text-slate-400">
-        Pas encore de compte ? {' '}
-        <a href="/auth/signup" className="text-cyan-400 hover:text-cyan-300 transition-colors">
-          S'inscrire
-        </a>
+        Les comptes sont créés uniquement par un administrateur.
       </div>
     </form>
   )

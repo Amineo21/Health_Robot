@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M3 Pro — Click to Pick</title>
+<script src="https://cdn.jsdelivr.net/npm/roslib@1/build/roslib.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, sans-serif; background: #0f1117; color: #e0e0e0; min-height: 100vh; }
+  header { background: #1a1d27; padding: 12px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #2a2d37; }
+  header h1 { font-size: 18px; font-weight: 600; }
+  #conn-status { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+  .connected { background: #1a3a2a; color: #4ade80; }
+  .disconnected { background: #3a1a1a; color: #f87171; }
+  .main { padding: 16px; max-width: 900px; margin: 0 auto; }
+  .cam-wrap { position: relative; background: #111318; border: 1px solid #2a2d37; border-radius: 8px; overflow: hidden; }
+  #cam { display: block; width: 100%; cursor: crosshair; user-select: none; }
+  #overlay { position: absolute; inset: 0; pointer-events: none; }
+  .stats { margin-top: 10px; background: #1a1d27; border-radius: 8px; padding: 12px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: #9ca3af; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
+  .stats .k { color: #6b7280; }
+  .state-pill { display: inline-block; padding: 2px 10px; border-radius: 12px; font-weight: 600; }
+  .state-IDLE { background: #1a3a2a; color: #4ade80; }
+  .state-HOVER, .state-DESCEND, .state-GRASP, .state-LIFT, .state-RELEASING, .state-RETURN { background: #3a2a1a; color: #fbbf24; }
+  .state-HOLDING { background: #1a2a3a; color: #60a5fa; }
+  .reachable-yes { color: #4ade80; }
+  .reachable-no { color: #f87171; }
+  .btn-row { margin-top: 12px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  button { padding: 12px 16px; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
+  button:hover:not([disabled]) { opacity: 0.85; }
+  button[disabled] { opacity: 0.35; cursor: not-allowed; }
+  .btn-green { background: #059669; color: white; }
+  .btn-blue  { background: #2563eb; color: white; }
+  .btn-gray  { background: #374151; color: white; }
+  .btn-red   { background: #dc2626; color: white; }
+  .hint { margin-top: 10px; font-size: 12px; color: #6b7280; }
+  #log { margin-top: 10px; background: #111318; border-radius: 6px; padding: 8px; font-family: ui-monospace, monospace; font-size: 11px; color: #9ca3af; max-height: 120px; overflow-y: auto; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Click to Pick</h1>
+  <span id="conn-status" class="disconnected">DISCONNECTED</span>
+  <span style="margin-left:auto;font-size:12px;color:#6b7280;">Click the object, then press GRASP</span>
+</header>
+
+<div class="main">
+  <div class="cam-wrap">
+    <img id="cam" src="" alt="camera stream">
+    <svg id="overlay" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+  </div>
+
+  <div class="stats">
+    <span class="k">state:</span>       <span id="state"><span class="state-pill state-IDLE">IDLE</span></span>
+    <span class="k">message:</span>     <span id="msg">—</span>
+    <span class="k">click (px):</span>  <span id="pxl">—</span>
+    <span class="k">depth (m):</span>   <span id="depth">—</span>
+    <span class="k">target base:</span> <span id="targ">—</span>
+    <span class="k">reachable:</span>   <span id="reach">—</span>
+    <span class="k">fk verified:</span> <span id="fkv">—</span>
+    <span class="k">IK↔FK err:</span>   <span id="err">—</span>
+    <span class="k">waypoint:</span>    <span id="wp">—</span>
+    <span class="k">servos:</span>      <span id="srv">—</span>
+  </div>
+
+  <div class="btn-row">
+    <button id="btn-grasp"   class="btn-green" disabled>GRASP</button>
+    <button id="btn-release" class="btn-blue"  disabled>RELEASE</button>
+    <button id="btn-home"    class="btn-gray">HOME</button>
+    <button id="btn-stop"    class="btn-red">STOP</button>
+  </div>
+
+  <div class="hint">Tip: only pick objects that show <span class="reachable-yes">reachable: true</span>. The gripper drops the object if RELEASE is pressed during HOLDING.</div>
+
+  <div class="panel" style="margin-top:16px;">
+    <div class="panel-header">Target XYZ calibration (meters)</div>
+    <div class="panel-body">
+      <div class="hint" style="margin:0 0 10px 0;">Compensate for URDF↔physical arm mismatch. If the arm lands <b>too low and too close</b>, increase Z and X.</div>
+      <div id="offset-sliders" style="display:grid;grid-template-columns:40px 1fr 64px;row-gap:6px;column-gap:8px;align-items:center;"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:16px;">
+    <div class="panel-header">Arm manual control</div>
+    <div class="panel-body">
+      <div class="hint" style="margin:0 0 10px 0;">Pose the arm to aim the camera at the desk, then click to pick. Each preset snaps the servos; the sliders fine-tune them.</div>
+      <div class="btn-row" style="grid-template-columns: repeat(3, 1fr);">
+        <button id="btn-pose-home"   class="btn-gray">Pose: HOME</button>
+        <button id="btn-pose-camdown" class="btn-gray">Pose: camera down</button>
+        <button id="btn-pose-pick"   class="btn-gray">Pose: pick-ready</button>
+      </div>
+      <div id="joint-sliders" style="margin-top:12px;display:grid;grid-template-columns:80px 1fr 56px;row-gap:6px;column-gap:8px;align-items:center;"></div>
+    </div>
+  </div>
+
+  <div id="log"></div>
+</div>
+
+<script>
+(function () {
+  const host = window.location.hostname;
+  const cam = document.getElementById("cam");
+  const overlay = document.getElementById("overlay");
+  const connEl = document.getElementById("conn-status");
+  const stateEl = document.getElementById("state");
+  const msgEl = document.getElementById("msg");
+  const pxlEl = document.getElementById("pxl");
+  const depthEl = document.getElementById("depth");
+  const targEl = document.getElementById("targ");
+  const reachEl = document.getElementById("reach");
+  const btnGrasp = document.getElementById("btn-grasp");
+  const btnRelease = document.getElementById("btn-release");
+  const btnHome = document.getElementById("btn-home");
+  const btnStop = document.getElementById("btn-stop");
+  const logEl = document.getElementById("log");
+
+  // Camera MJPEG stream served by web_server_node
+  cam.src = `http://${host}:8080/camera/stream`;
+
+  function log(s) {
+    const t = new Date().toLocaleTimeString();
+    logEl.textContent = `[${t}] ${s}\n` + logEl.textContent;
+  }
+
+  // rosbridge
+  const ros = new ROSLIB.Ros({ url: `ws://${host}:9090` });
+  ros.on("connection", () => { connEl.textContent = "CONNECTED"; connEl.className = "connected"; log("rosbridge connected"); });
+  ros.on("error",     (e) => { connEl.textContent = "ERROR"; connEl.className = "disconnected"; log("rosbridge error: " + (e && e.message || e)); });
+  ros.on("close",     () => { connEl.textContent = "DISCONNECTED"; connEl.className = "disconnected"; });
+
+  const clickTopic = new ROSLIB.Topic({ ros, name: "/teacher/pick_click", messageType: "geometry_msgs/Point" });
+  const cmdTopic   = new ROSLIB.Topic({ ros, name: "/teacher/pick_command", messageType: "std_msgs/String" });
+  const statusTopic = new ROSLIB.Topic({ ros, name: "/teacher/pick_status", messageType: "std_msgs/String" });
+
+  let lastClickNative = null;
+  let currentState = "IDLE";
+  let currentReachable = false;
+
+  cam.addEventListener("click", (e) => {
+    // Get native image size; the MJPEG stream provides naturalWidth/Height once a frame has decoded.
+    const nw = cam.naturalWidth || cam.width;
+    const nh = cam.naturalHeight || cam.height;
+    const rect = cam.getBoundingClientRect();
+    const xRatio = (e.clientX - rect.left) / rect.width;
+    const yRatio = (e.clientY - rect.top) / rect.height;
+    const u = Math.round(xRatio * nw);
+    const v = Math.round(yRatio * nh);
+    lastClickNative = { u, v, rx: xRatio * 100, ry: yRatio * 100 };
+    drawOverlay();
+    const pt = new ROSLIB.Message({ x: u, y: v, z: 0.0 });
+    clickTopic.publish(pt);
+    pxlEl.textContent = `(${u}, ${v})`;
+    log(`click → (${u}, ${v})`);
+  });
+
+  function drawOverlay() {
+    if (!lastClickNative) { overlay.innerHTML = ""; return; }
+    const { rx, ry } = lastClickNative;
+    const color = currentReachable ? "#4ade80" : "#f87171";
+    overlay.innerHTML = `
+      <circle cx="${rx}" cy="${ry}" r="1.2" fill="none" stroke="${color}" stroke-width="0.3"/>
+      <circle cx="${rx}" cy="${ry}" r="0.4" fill="${color}"/>
+      <line x1="${rx - 3}" y1="${ry}" x2="${rx - 0.8}" y2="${ry}" stroke="${color}" stroke-width="0.2"/>
+      <line x1="${rx + 0.8}" y1="${ry}" x2="${rx + 3}" y2="${ry}" stroke="${color}" stroke-width="0.2"/>
+      <line x1="${rx}" y1="${ry - 3}" x2="${rx}" y2="${ry - 0.8}" stroke="${color}" stroke-width="0.2"/>
+      <line x1="${rx}" y1="${ry + 0.8}" x2="${rx}" y2="${ry + 3}" stroke="${color}" stroke-width="0.2"/>`;
+  }
+
+  function setState(st) {
+    currentState = st;
+    stateEl.innerHTML = `<span class="state-pill state-${st}">${st}</span>`;
+    // Button enablement
+    btnGrasp.disabled   = !(currentReachable && (st === "IDLE" || st === "HOLDING"));
+    btnRelease.disabled = st !== "HOLDING";
+  }
+
+  const fkvEl = document.getElementById("fkv");
+  const errEl = document.getElementById("err");
+  const wpEl  = document.getElementById("wp");
+  const srvEl = document.getElementById("srv");
+
+  statusTopic.subscribe((msg) => {
+    let d; try { d = JSON.parse(msg.data); } catch { return; }
+    if (d.state) setState(d.state);
+    if (typeof d.msg === "string") msgEl.textContent = d.msg;
+    if (d.pixel) pxlEl.textContent = `(${d.pixel[0]}, ${d.pixel[1]})`;
+    if (typeof d.depth === "number") depthEl.textContent = d.depth.toFixed(3);
+    if (d.target) targEl.textContent = `(${d.target[0]}, ${d.target[1]}, ${d.target[2]})`;
+    if (d.fk_verified) fkvEl.textContent = `(${d.fk_verified[0]}, ${d.fk_verified[1]}, ${d.fk_verified[2]})`;
+    if (typeof d.err_mm === "number") {
+      const good = d.err_mm < 20;
+      errEl.innerHTML = `<span class="reachable-${good ? "yes" : "no"}">${d.err_mm} mm</span>`;
+    }
+    if (d.waypoint) wpEl.textContent = `(${d.waypoint[0]}, ${d.waypoint[1]}, ${d.waypoint[2]})`;
+    if (d.servos) srvEl.textContent = `[${d.servos.join(", ")}]`;
+    if (typeof d.reachable === "boolean") {
+      currentReachable = d.reachable;
+      reachEl.innerHTML = d.reachable
+        ? `<span class="reachable-yes">yes</span>`
+        : `<span class="reachable-no">no</span>`;
+      drawOverlay();
+      setState(currentState);
+    }
+  });
+
+  function sendCmd(s) {
+    cmdTopic.publish(new ROSLIB.Message({ data: s }));
+    log("cmd: " + s);
+  }
+  btnGrasp.addEventListener("click",  () => sendCmd("grasp"));
+  btnRelease.addEventListener("click",() => sendCmd("release"));
+  btnHome.addEventListener("click",   () => sendCmd("home"));
+  btnStop.addEventListener("click",   () => sendCmd("stop"));
+
+  // -------- Calibration offsets --------
+  const offsetTopic = new ROSLIB.Topic({ ros, name: "/teacher/pick_offset", messageType: "geometry_msgs/Point" });
+  const OFFSETS = [
+    { key: "x", label: "X", val: 0.04 },   // forward bias (m)
+    { key: "y", label: "Y", val: 0.00 },   // lateral bias (m)
+    { key: "z", label: "Z", val: 0.03 },   // vertical bias (m)
+  ];
+  function publishOffset() {
+    const xyz = Object.fromEntries(OFFSETS.map(o => [o.key, o.val]));
+    offsetTopic.publish(new ROSLIB.Message({ x: xyz.x, y: xyz.y, z: xyz.z }));
+  }
+  const oGrid = document.getElementById("offset-sliders");
+  OFFSETS.forEach(o => {
+    const lab = document.createElement("span");
+    lab.textContent = o.label;
+    lab.style.cssText = "font-size:12px;color:#9ca3af;";
+    const input = document.createElement("input");
+    input.type = "range"; input.min = -0.10; input.max = 0.15; input.step = 0.005; input.value = o.val;
+    input.style.width = "100%";
+    const out = document.createElement("span");
+    out.textContent = o.val.toFixed(3);
+    out.style.cssText = "font-family:ui-monospace,monospace;font-size:12px;color:#e0e0e0;text-align:right;";
+    let timer = null;
+    input.addEventListener("input", () => {
+      o.val = parseFloat(input.value);
+      out.textContent = o.val.toFixed(3);
+      clearTimeout(timer);
+      timer = setTimeout(publishOffset, 120);
+    });
+    oGrid.appendChild(lab); oGrid.appendChild(input); oGrid.appendChild(out);
+    o._input = input; o._out = out;
+  });
+  setTimeout(publishOffset, 800);  // push defaults once connected
+
+  // -------- Arm manual control --------
+  const armTopic = new ROSLIB.Topic({ ros, name: "/arm6_joints", messageType: "arm_msgs/ArmJoints" });
+
+  // Name, default, min, max (servo degrees; gripper uses same scale)
+  const JOINTS = [
+    { key: "joint1", label: "base yaw",     min: 0,  max: 180, val: 90 },
+    { key: "joint2", label: "shoulder",     min: 0,  max: 180, val: 120 },
+    { key: "joint3", label: "elbow",        min: 0,  max: 180, val: 10 },
+    { key: "joint4", label: "wrist pitch",  min: 0,  max: 180, val: 20 },
+    { key: "joint5", label: "wrist roll",   min: 0,  max: 180, val: 90 },
+    { key: "joint6", label: "gripper",      min: 20, max: 150, val: 30 },
+  ];
+  const POSES = {
+    home:    { joint1: 90, joint2: 120, joint3:  10, joint4: 20,  joint5: 90, joint6: 30  },
+    camdown: { joint1: 90, joint2: 140, joint3:  30, joint4: 40,  joint5: 90, joint6: 30  },
+    pick:    { joint1: 90, joint2: 100, joint3:  70, joint4: 80,  joint5: 90, joint6: 30  },
+  };
+
+  function publishArm() {
+    const msg = { time: 800 };
+    JOINTS.forEach(j => { msg[j.key] = Math.round(j.val); });
+    armTopic.publish(new ROSLIB.Message(msg));
+  }
+
+  const sliderGrid = document.getElementById("joint-sliders");
+  JOINTS.forEach(j => {
+    const lab = document.createElement("span");
+    lab.textContent = j.label;
+    lab.style.cssText = "font-size:12px;color:#9ca3af;";
+    const input = document.createElement("input");
+    input.type = "range";
+    input.min = j.min; input.max = j.max; input.step = 1; input.value = j.val;
+    input.style.width = "100%";
+    const out = document.createElement("span");
+    out.textContent = j.val;
+    out.style.cssText = "font-family:ui-monospace,monospace;font-size:12px;color:#e0e0e0;text-align:right;";
+    let timer = null;
+    input.addEventListener("input", () => {
+      j.val = parseInt(input.value, 10);
+      out.textContent = j.val;
+      clearTimeout(timer);
+      timer = setTimeout(publishArm, 80); // debounce while dragging
+    });
+    sliderGrid.appendChild(lab);
+    sliderGrid.appendChild(input);
+    sliderGrid.appendChild(out);
+    j._input = input;
+    j._out = out;
+  });
+
+  function applyPose(pose) {
+    JOINTS.forEach(j => {
+      if (pose[j.key] !== undefined) {
+        j.val = pose[j.key];
+        j._input.value = pose[j.key];
+        j._out.textContent = pose[j.key];
+      }
+    });
+    publishArm();
+    log("pose: " + Object.entries(pose).map(([k, v]) => `${k}=${v}`).join(" "));
+  }
+  document.getElementById("btn-pose-home").addEventListener("click",    () => applyPose(POSES.home));
+  document.getElementById("btn-pose-camdown").addEventListener("click", () => applyPose(POSES.camdown));
+  document.getElementById("btn-pose-pick").addEventListener("click",    () => applyPose(POSES.pick));
+
+  setState("IDLE");
+})();
+</script>
+</body>
+</html>

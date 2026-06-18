@@ -1,10 +1,36 @@
+import { useEffect, useRef, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 import { Bot, MapPin, Navigation, MousePointer2, CheckCircle } from 'lucide-react'
 
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { RobotKeyboardTeleop } from '@/components/robot-keyboard-teleop'
+import { useAuth } from '@/contexts/AuthContext'
+import { ApiError } from '@/lib/api'
+import { canUseAdminControls, CAREGIVER_OR_ADMIN_ROLES } from '@/lib/permissions'
+import {
+  deleteSavedRobotMap,
+  fetchCurrentRobotMap,
+  fetchRobotMapMode,
+  fetchSavedRobotMaps,
+  loadSavedRobotMap,
+  saveCurrentRobotMap,
+  startMappingMode,
+  type RobotMapSnapshot,
+  type SavedRobotMap,
+} from '@/lib/robot-api'
 import { useRobot } from '@/lib/robot-context'
+import { cn } from '@/lib/utils'
 
-export const Route = createFileRoute('/map')({ component: MapPage })
+export const Route = createFileRoute('/map')({ component: MapRoute })
+
+function MapRoute() {
+  return (
+    <ProtectedRoute allowedRoles={CAREGIVER_OR_ADMIN_ROLES}>
+      <MapPage />
+    </ProtectedRoute>
+  )
+}
 
 const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:4000') as string
 
@@ -111,9 +137,20 @@ function MapPage() {
 
   return (
     <div className="space-y-6 px-4 py-6 text-white sm:px-6 lg:px-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Live Map</h1>
-        <p className="text-sm text-slate-400">Real-time robot position and navigation</p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Cartographie du robot</h1>
+          <p className="text-sm text-slate-400">Construction, sauvegarde et affichage de la carte ROS depuis le backend sécurisé.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void refreshMaps()}
+          disabled={isLoading || isActionRunning}
+          className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+          Actualiser
+        </button>
       </div>
 
       {arrivalMessage && (
@@ -186,8 +223,9 @@ function MapPage() {
                 <div className="flex items-center justify-between gap-4"><span className="text-slate-400">Type</span><span className="rounded-full border border-white/10 px-3 py-1 capitalize text-white">{activeMission.type}</span></div>
                 <div className="flex items-center justify-between gap-4"><span className="text-slate-400">Statut</span><span className="rounded-full bg-cyan-400/10 px-3 py-1 text-cyan-200">En cours</span></div>
               </div>
-            </article>
-          )}
+              {!isAdmin && <p className="text-xs text-amber-200">Les actions mapping/save/load/delete sont réservées aux administrateurs.</p>}
+            </div>
+          </article>
 
           <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
             <h2 className="flex items-center gap-2 text-base font-semibold"><MapPin className="h-5 w-5" /> Légende</h2>

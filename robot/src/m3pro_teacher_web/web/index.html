@@ -1,0 +1,1731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M3 Pro Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/roslib@1/build/roslib.min.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #1a1d27; --panel-2: #111318; --border: #2a2d37;
+    --text: #e0e0e0; --muted: #9ca3af; --dim: #6b7280;
+    --green: #059669; --green-glow: #4ade80; --red: #dc2626; --red-glow: #f87171;
+    --blue: #2563eb; --blue-glow: #60a5fa; --yellow: #d97706; --yellow-glow: #fbbf24;
+    --purple: #7c3aed; --purple-glow: #a78bfa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+  header { background: var(--panel); padding: 10px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  header h1 { font-size: 16px; font-weight: 600; }
+  header .spacer { flex: 1; }
+  .tag { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; }
+  .tag.connected { background: #0f3d29; color: var(--green-glow); }
+  .tag.disconnected { background: #3a1a1a; color: var(--red-glow); }
+  .tag.mode { background: #1f2937; color: var(--blue-glow); }
+  .tag.teleop-on { background: #5b3410; color: var(--yellow-glow); animation: pulse 1.3s infinite; }
+  @keyframes pulse { 50% { opacity: 0.55; } }
+
+  main { flex: 1; display: grid; grid-template-columns: 1.3fr 1fr; gap: 8px; padding: 8px; min-height: 0; }
+  .panel { background: var(--panel); border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .panel-head { padding: 8px 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .panel-body { padding: 10px; flex: 1; min-height: 0; overflow: auto; }
+  .panel-body.flush { padding: 0; }
+
+  .right-col { display: grid; grid-template-rows: 0.85fr 0.55fr auto auto auto auto; gap: 8px; min-height: 0; }
+
+  /* Arm sliders */
+  .joint-row { display: grid; grid-template-columns: 52px 1fr 36px; gap: 6px; align-items: center; font-size: 11px; }
+  .joint-row label { color: var(--muted); letter-spacing: 0.3px; }
+  .joint-row input[type=range] { width: 100%; accent-color: var(--purple-glow); }
+  .joint-row .jval { text-align: right; font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }
+
+  /* 3D viewer */
+  #viewer3d { width: 100%; height: 100%; display: block; background: #05070b; }
+
+  /* Camera */
+  #camera-feed { width: 100%; height: 100%; object-fit: contain; background: var(--panel-2); display: block; }
+  .cam-head { display: flex; align-items: center; gap: 8px; }
+  .cam-select { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 4px; font-size: 11px; padding: 2px 6px; }
+
+  /* Stats */
+  .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  .stat { background: var(--panel-2); border-radius: 6px; padding: 8px 10px; }
+  .stat-label { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.4px; }
+  .stat-value { font-size: 14px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+  /* Controls */
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  button { padding: 10px 10px; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: transform 0.08s, opacity 0.15s, box-shadow 0.15s; color: white; letter-spacing: 0.2px; }
+  button:hover { opacity: 0.9; }
+  button:active { transform: scale(0.97); }
+  button:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-green { background: var(--green); }
+  .btn-red { background: var(--red); }
+  .btn-blue { background: var(--blue); }
+  .btn-yellow { background: var(--yellow); }
+  .btn-purple { background: var(--purple); }
+  .btn-gray { background: #374151; }
+  .btn-active { box-shadow: 0 0 0 2px var(--yellow-glow), 0 0 12px rgba(251, 191, 36, 0.4); }
+
+  /* Log */
+  #log { font-family: "SF Mono", Consolas, monospace; font-size: 10.5px; background: var(--panel-2); border-radius: 4px; padding: 6px 8px; max-height: 110px; min-height: 44px; overflow-y: auto; white-space: pre-wrap; color: var(--muted); margin-top: 6px; line-height: 1.45; }
+  #log .ok { color: var(--green-glow); }
+  #log .err { color: var(--red-glow); }
+  #log .info { color: var(--blue-glow); }
+
+  /* Modal */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 100; }
+  .modal-backdrop.show { display: flex; }
+  .modal { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; width: min(440px, 92vw); max-height: 90vh; overflow: auto; }
+  .modal-head { padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 600; }
+  .modal-body { padding: 16px; display: grid; gap: 14px; }
+  .modal-foot { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+  .field label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .field label .val { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .field input[type=range] { width: 100%; }
+  .field .hint { font-size: 10.5px; color: var(--dim); margin-top: 3px; line-height: 1.4; }
+
+  /* Teleop overlay */
+  #teleop-help { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); background: rgba(217, 119, 6, 0.95); color: black; font-weight: 700; padding: 10px 18px; border-radius: 8px; font-size: 13px; letter-spacing: 0.5px; display: none; box-shadow: 0 8px 28px rgba(251, 191, 36, 0.4); pointer-events: none; }
+  #teleop-help.on { display: block; }
+  #teleop-help kbd { background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 3px; margin: 0 2px; font-family: inherit; }
+
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } .right-col { grid-template-rows: auto auto auto; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🤖 M3 Pro Dashboard</h1>
+  <span id="conn-status" class="tag disconnected">DISCONNECTED</span>
+  <span id="mode-tag" class="tag mode">MODE: —</span>
+  <span id="watchdog-tag" class="tag mode" title="Per-service health from m3pro_teacher_watchdog">svc: —</span>
+  <button class="btn-green" style="padding:4px 10px;font-size:11px;" onclick="switchMode('mapping')"
+          title="Start manual MAPPING mode (SLAM + rosbridge). Use teleop to build the map.">🗺️ Map</button>
+  <button class="btn-blue" style="padding:4px 10px;font-size:11px;" onclick="switchMode('navigation')"
+          title="Start NAVIGATION mode (AMCL on a saved map). Enables /initialpose.">🧭 Navigate</button>
+  <button class="btn-yellow" style="padding:4px 10px;font-size:11px;" onclick="resetSlam()"
+          title="Restart the current mapping/navigation stack in-place.">🔄 Reset SLAM</button>
+  <span id="explore-tag" class="tag mode" style="display:none;">EXPLORING</span>
+  <span id="teleop-tag" class="tag teleop-on" style="display:none;">TELEOP</span>
+  <div class="spacer"></div>
+  <span class="tag mode" id="fps-tag">--</span>
+</header>
+
+<main>
+  <!-- ========== 3D VIEWER ========== -->
+  <section class="panel">
+    <div class="panel-head">
+      <span>Map Viewer</span>
+      <div style="display:inline-flex;border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-left:6px;">
+        <button id="view-3d" class="btn-gray" style="padding:3px 10px;font-size:10.5px;border-radius:0;border:0;background:#1f2937;" onclick="setView('3d')">3D</button>
+        <button id="view-2d" class="btn-gray" style="padding:3px 10px;font-size:10.5px;border-radius:0;border:0;" onclick="setView('2d')">2D</button>
+      </div>
+      <span style="flex:1"></span>
+      <label style="font-size:11px;display:flex;gap:4px;align-items:center;cursor:pointer;">
+        <input type="checkbox" id="show-scan" checked> laser
+      </label>
+      <label style="font-size:11px;display:flex;gap:4px;align-items:center;cursor:pointer;">
+        <input type="checkbox" id="show-path" checked> path
+      </label>
+      <label style="font-size:11px;display:flex;gap:4px;align-items:center;cursor:pointer;">
+        <input type="checkbox" id="show-frontiers" checked> frontiers
+      </label>
+      <button class="btn-gray" style="padding:3px 10px;font-size:11px;" onclick="clearPins()">🗑 pins</button>
+      <button class="btn-gray" style="padding:3px 10px;font-size:11px;" onclick="resetCamera()">reset view</button>
+    </div>
+    <div style="padding:4px 12px;font-size:10.5px;color:var(--muted);background:var(--panel-2);border-bottom:1px solid var(--border);">
+      <span id="viewer-hint">Right-click = nav goal (numbered pin) &middot; Shift-click = Set Pose (Navigation mode) &middot; Left-drag = orbit / pan</span>
+    </div>
+    <div class="panel-body flush" style="position:relative;">
+      <canvas id="viewer3d"></canvas>
+      <div id="teleop-help">
+        TELEOP <kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> to drive &nbsp;·&nbsp; <kbd>SPACE</kbd> stop &nbsp;·&nbsp; <kbd>ESC</kbd> exit
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== RIGHT COLUMN ========== -->
+  <div class="right-col">
+
+    <!-- Camera -->
+    <section class="panel">
+      <div class="panel-head cam-head">
+        <span>Camera</span>
+        <span style="flex:1"></span>
+        <select id="camera-select" class="cam-select">
+          <option value="raw">Live MJPEG</option>
+          <option value="snapshot">Snapshot (5 FPS)</option>
+          <option value="off">Off</option>
+        </select>
+      </div>
+      <div class="panel-body flush">
+        <img id="camera-feed" alt="camera offline">
+      </div>
+    </section>
+
+    <!-- Robot state -->
+    <section class="panel">
+      <div class="panel-head"><span>Robot State</span></div>
+      <div class="panel-body">
+        <div class="stats">
+          <div class="stat"><div class="stat-label">Position</div><div class="stat-value" id="pos-value">—</div></div>
+          <div class="stat"><div class="stat-label">Heading</div><div class="stat-value" id="yaw-value">—</div></div>
+          <div class="stat"><div class="stat-label">Lin Vel</div><div class="stat-value" id="lin-vel">—</div></div>
+          <div class="stat"><div class="stat-label">Ang Vel</div><div class="stat-value" id="ang-vel">—</div></div>
+          <div class="stat"><div class="stat-label">Nearest Obs</div><div class="stat-value" id="nearest-obs">—</div></div>
+          <div class="stat"><div class="stat-label">Map Size</div><div class="stat-value" id="map-size">—</div></div>
+          <div class="stat" style="grid-column:1/-1;">
+            <div class="stat-label">Battery <span id="bat-volt" style="float:right;color:var(--muted);font-weight:400;">— V</span></div>
+            <div style="height:10px;background:var(--panel);border-radius:5px;overflow:hidden;margin-top:6px;">
+              <div id="bat-bar" style="height:100%;width:0%;background:var(--green);transition:width 0.3s, background 0.3s;"></div>
+            </div>
+            <div class="stat-value" id="bat-pct" style="margin-top:4px;">—</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Maps -->
+    <section class="panel" style="flex-shrink:0;">
+      <div class="panel-head">
+        <span>Saved Maps</span>
+        <span style="flex:1"></span>
+        <button class="btn-yellow" style="padding:3px 10px;font-size:10.5px;" onclick="saveMapAs()" title="Save current SLAM map to /root/maps">💾 Save…</button>
+        <button class="btn-gray" style="padding:3px 10px;font-size:10.5px;" onclick="refreshMaps()">↻</button>
+      </div>
+      <div class="panel-body" style="padding:8px 10px;">
+        <div id="map-list" style="display:grid;gap:4px;min-height:32px;"></div>
+      </div>
+    </section>
+
+    <!-- Horn + Soundboard -->
+    <section class="panel" style="flex-shrink:0;">
+      <div class="panel-head">
+        <span>Horn / Soundboard</span>
+        <span style="flex:1"></span>
+        <label title="Hold number keys 1-9 to play soundboard slots" style="font-size:10.5px;color:var(--muted);">hotkeys: 1-9</label>
+      </div>
+      <div class="panel-body" style="display:grid;gap:6px;padding:8px 10px;">
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;">
+          <button class="btn-red" style="padding:6px;font-size:10.5px;" onclick="beepPattern('single')" title="One short beep">🔊 ×1</button>
+          <button class="btn-red" style="padding:6px;font-size:10.5px;" onclick="beepPattern('triple')" title="Three short beeps">🔊 ×3</button>
+          <button class="btn-red" style="padding:6px;font-size:10.5px;" onclick="beepPattern('long')" title="One long beep">🔊 ───</button>
+          <button class="btn-red" style="padding:6px;font-size:10.5px;" onclick="beepPattern('sos')" title="SOS pattern: ···———···">🆘 SOS</button>
+          <button class="btn-red" style="padding:6px;font-size:10.5px;" onclick="beepPattern('alarm')" title="Continuous alarm, click again to stop">🚨 Alarm</button>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <label class="btn-gray" style="padding:6px 10px;font-size:11px;cursor:pointer;flex:1;text-align:center;">
+            ⬆ Upload MP3
+            <input type="file" id="sound-upload" accept="audio/*" multiple style="display:none;">
+          </label>
+          <button class="btn-gray" style="padding:6px 10px;font-size:11px;" onclick="refreshSounds()">↻ Refresh</button>
+        </div>
+        <div id="sound-slots" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;min-height:32px;">
+          <!-- slot buttons injected by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Arm -->
+    <section class="panel" style="flex-shrink:0;">
+      <div class="panel-head">
+        <span>Arm / Camera Aim</span>
+        <span style="flex:1"></span>
+        <button class="btn-gray" style="padding:3px 8px;font-size:10.5px;" onclick="armPreset('center')">Center</button>
+        <button class="btn-gray" style="padding:3px 8px;font-size:10.5px;" onclick="armPreset('camera_up')">Camera↑</button>
+        <button class="btn-gray" style="padding:3px 8px;font-size:10.5px;" onclick="armPreset('camera_fwd')">Camera→</button>
+      </div>
+      <div class="panel-body" style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;padding:8px 12px;">
+        <!-- 6 joints; injected by JS -->
+        <div id="arm-sliders" style="display:contents;"></div>
+      </div>
+    </section>
+
+    <!-- Controls -->
+    <section class="panel" style="flex-shrink:0;">
+      <div class="panel-head"><span>Controls</span></div>
+      <div class="panel-body">
+        <div class="btn-row" style="margin-bottom:6px;">
+          <button class="btn-green" id="btn-explore" onclick="toggleExplore()" style="display:none;">▶ Explore</button>
+          <button class="btn-blue" onclick="comeHome()">🏠 Come Home</button>
+          <button class="btn-purple" id="btn-teleop" onclick="toggleTeleop()">⌨ Teleop</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn-yellow" onclick="saveMap()">💾 Save Map</button>
+          <button class="btn-gray" id="btn-config" onclick="openConfig()" style="display:none;">⚙ Configure</button>
+          <button class="btn-red" onclick="abort()">■ Abort</button>
+        </div>
+        <div class="btn-row" style="margin-top:6px;grid-template-columns:1fr 1fr 1fr;">
+          <button class="btn-purple" id="btn-setpose" onclick="toggleSetPose()"
+                  title="Tell the localizer where the robot is after you picked it up. Click the button, then click the map where the robot is actually standing. (Publishes /initialpose for AMCL or slam_toolbox localization.)">📍 Set Pose</button>
+          <button class="btn-purple" onclick="setPoseOrigin()"
+                  title="Quick shortcut — set pose to (0,0,0). Use when you just put the robot back at the map origin.">🧭 Pose = Origin</button>
+          <button class="btn-gray" onclick="clearCostmaps()"
+                  title="Ask Nav2 to clear its costmaps — fixes 'phantom' obstacles stuck in the planner (map layer is untouched).">🧹 Clear Costmaps</button>
+        </div>
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:6px;margin-top:6px;">
+          <button class="btn-blue" id="btn-ptt"
+                  onmousedown="pttDown()" onmouseup="pttUp()" onmouseleave="pttUp()"
+                  ontouchstart="pttDown(event)" ontouchend="pttUp(event)">
+            🎙 Hold to Talk
+          </button>
+          <span id="ptt-status" class="tag mode" style="text-align:center;align-self:center;">IDLE</span>
+        </div>
+        <div id="log">Dashboard loaded. Connecting…</div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- ========== CONFIG MODAL ========== -->
+<div class="modal-backdrop" id="config-modal">
+  <div class="modal">
+    <div class="modal-head">Configure Exploration</div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Gain scale <span class="val" id="val-gain">5.0</span></label>
+        <input type="range" id="cfg-gain" min="0.5" max="15" step="0.5" value="5.0">
+        <div class="hint">Higher → prefer larger (longer-perimeter) frontiers. Default 1.0.</div>
+      </div>
+      <div class="field">
+        <label>Potential scale <span class="val" id="val-potential">1.0</span></label>
+        <input type="range" id="cfg-potential" min="0.1" max="10" step="0.1" value="1.0">
+        <div class="hint">Higher → heavier travel-cost penalty (stays closer). Default 3.0.</div>
+      </div>
+      <div class="field">
+        <label>Min frontier size (m) <span class="val" id="val-min">0.50</span></label>
+        <input type="range" id="cfg-min" min="0.1" max="2.0" step="0.05" value="0.50">
+        <div class="hint">Ignore frontier clusters smaller than this. Higher = less noise.</div>
+      </div>
+      <div class="field">
+        <label>Max linear speed (m/s) <span class="val" id="val-vel">0.20</span></label>
+        <input type="range" id="cfg-vel" min="0.05" max="0.40" step="0.01" value="0.20">
+        <div class="hint">Teleop speed cap (Nav2 max kept separately).</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-gray" onclick="closeConfig()">Cancel</button>
+      <button class="btn-green" onclick="applyConfig()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     JAVASCRIPT
+============================================================ -->
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ==== Connection ============================================================
+const urlPort = new URLSearchParams(location.search).get('port') || '9090';
+const host = location.hostname || 'localhost';
+const ros = new ROSLIB.Ros({ url: `ws://${host}:${urlPort}` });
+window.ros = ros;
+
+const connEl = document.getElementById('conn-status');
+ros.on('connection', () => {
+  connEl.textContent = 'CONNECTED';
+  connEl.className = 'tag connected';
+  log('Connected to rosbridge', 'ok');
+  refreshModeState();
+});
+ros.on('close', () => { connEl.textContent = 'DISCONNECTED'; connEl.className = 'tag disconnected'; log('rosbridge connection closed', 'err'); });
+ros.on('error', () => { log('rosbridge connection error', 'err'); });
+
+function log(msg, cls='') {
+  const el = document.getElementById('log');
+  const t = new Date().toLocaleTimeString();
+  const span = document.createElement('span');
+  span.className = cls;
+  span.textContent = `[${t}] ${msg}\n`;
+  el.appendChild(span);
+  el.scrollTop = el.scrollHeight;
+  while (el.childNodes.length > 80) el.removeChild(el.firstChild);
+}
+window.log = log;
+
+// ==== 3D Scene ==============================================================
+const canvas = document.getElementById('viewer3d');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+renderer.setPixelRatio(window.devicePixelRatio);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05070b);
+
+const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 200);
+const orbit = new OrbitControls(camera, renderer.domElement);
+orbit.enableDamping = true;
+orbit.dampingFactor = 0.08;
+orbit.screenSpacePanning = true;
+
+// Grid + axes for orientation
+const grid = new THREE.GridHelper(20, 40, 0x333a48, 0x1a1f2a);
+grid.rotation.x = Math.PI / 2;  // Three.js grid defaults to XZ; flip to XY (map plane)
+scene.add(grid);
+const axes = new THREE.AxesHelper(0.5);
+scene.add(axes);
+
+// Swap between perspective 3D and orthographic top-down 2D. The scene
+// stays the same — only the camera and orbit behavior change.
+const orthoCamera = new THREE.OrthographicCamera(-6, 6, 6, -6, 0.1, 200);
+orthoCamera.up.set(0, 1, 0);
+orthoCamera.position.set(0, 0, 30);
+orthoCamera.lookAt(0, 0, 0);
+let activeCamera = camera;
+let viewMode = '3d';
+const orthoOrbit = new OrbitControls(orthoCamera, renderer.domElement);
+orthoOrbit.enableRotate = false;     // top-down is locked
+orthoOrbit.enableDamping = true;
+orthoOrbit.screenSpacePanning = true;
+orthoOrbit.enabled = false;          // start disabled (3D is active)
+
+function setView(mode) {
+  viewMode = mode;
+  document.getElementById('view-3d').style.background = mode === '3d' ? '#1f2937' : '';
+  document.getElementById('view-2d').style.background = mode === '2d' ? '#1f2937' : '';
+  document.getElementById('viewer-hint').innerHTML = mode === '2d'
+    ? 'Click = nav goal (pin) &middot; shift-click = set pose (Navigation mode)'
+    : '3D: drag to orbit &middot; shift-click = set pose (Navigation mode)';
+  if (mode === '3d') {
+    activeCamera = camera;
+    orbit.enabled = true;
+    orthoOrbit.enabled = false;
+  } else {
+    activeCamera = orthoCamera;
+    orbit.enabled = false;
+    orthoOrbit.enabled = true;
+    // Center ortho on robot if we have a pose, else origin.
+    orthoCamera.position.set(robotMapPose[0], robotMapPose[1], 30);
+    orthoOrbit.target.set(robotMapPose[0], robotMapPose[1], 0);
+    orthoOrbit.update();
+  }
+  resize();
+}
+window.setView = setView;
+
+function resetCamera() {
+  if (viewMode === '3d') {
+    camera.position.set(0, -6, 6);
+    camera.up.set(0, 0, 1);
+    orbit.target.set(0, 0, 0);
+    orbit.update();
+  } else {
+    // Fit ortho to current map extent, centered on robot.
+    const span = mapData ? Math.max(mapData.info.width, mapData.info.height) * mapData.info.resolution : 12;
+    const half = span / 2 + 0.5;
+    orthoCamera.left = -half; orthoCamera.right = half;
+    orthoCamera.top = half;   orthoCamera.bottom = -half;
+    orthoCamera.position.set(robotMapPose[0], robotMapPose[1], 30);
+    orthoOrbit.target.set(robotMapPose[0], robotMapPose[1], 0);
+    orthoCamera.updateProjectionMatrix();
+    orthoOrbit.update();
+  }
+}
+window.resetCamera = resetCamera;
+resetCamera();
+
+function resize() {
+  const r = canvas.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false);
+  camera.aspect = r.width / r.height;
+  camera.updateProjectionMatrix();
+  // Ortho camera keeps frustum aspect matching the canvas.
+  const aspect = r.width / r.height;
+  const span = (orthoCamera.top - orthoCamera.bottom) / 2;
+  orthoCamera.left = -span * aspect;
+  orthoCamera.right = span * aspect;
+  orthoCamera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(canvas);
+resize();
+
+// ---- Robot pose indicator ---------------------------------------------------
+const robotGroup = new THREE.Group();
+const robotBody = new THREE.Mesh(
+  new THREE.ConeGeometry(0.12, 0.28, 8),
+  new THREE.MeshBasicMaterial({ color: 0x4ade80 })
+);
+robotBody.rotation.z = -Math.PI / 2;  // cone points along +X
+robotBody.position.x = 0.14;
+robotGroup.add(robotBody);
+const robotBase = new THREE.Mesh(
+  new THREE.CircleGeometry(0.18, 24),
+  new THREE.MeshBasicMaterial({ color: 0x4ade80, transparent: true, opacity: 0.25 })
+);
+robotGroup.add(robotBase);
+scene.add(robotGroup);
+
+// ---- OccupancyGrid -> textured plane ---------------------------------------
+let mapMesh = null;
+let mapData = null;
+function updateMap(msg) {
+  mapData = msg;
+  const info = msg.info;
+  const w = info.width, h = info.height;
+  document.getElementById('map-size').textContent = `${w}×${h} @ ${info.resolution.toFixed(2)}m`;
+
+  // Build RGBA data texture
+  const pixels = new Uint8Array(w * h * 4);
+  for (let i = 0; i < w * h; i++) {
+    const v = msg.data[i];
+    let r, g, b, a = 255;
+    if (v < 0)      { r = 34; g = 38; b = 48; a = 180; }  // unknown (translucent)
+    else if (v < 30){ r = 22; g = 26; b = 34; }            // free
+    else            { r = 220; g = 225; b = 235; }         // occupied
+    pixels[i*4] = r; pixels[i*4+1] = g; pixels[i*4+2] = b; pixels[i*4+3] = a;
+  }
+  const tex = new THREE.DataTexture(pixels, w, h, THREE.RGBAFormat);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.flipY = false;
+  tex.needsUpdate = true;
+
+  if (mapMesh) { scene.remove(mapMesh); mapMesh.geometry.dispose(); mapMesh.material.map.dispose(); mapMesh.material.dispose(); }
+  const geo = new THREE.PlaneGeometry(w * info.resolution, h * info.resolution);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+  mapMesh = new THREE.Mesh(geo, mat);
+  mapMesh.position.x = info.origin.position.x + (w * info.resolution) / 2;
+  mapMesh.position.y = info.origin.position.y + (h * info.resolution) / 2;
+  mapMesh.position.z = -0.01;
+  scene.add(mapMesh);
+}
+
+// ---- LaserScan -> points ---------------------------------------------------
+let scanPoints = null;
+const scanMat = new THREE.PointsMaterial({ color: 0xff4d4d, size: 0.06, sizeAttenuation: true });
+function updateScan(msg) {
+  if (!document.getElementById('show-scan').checked) {
+    if (scanPoints) scanPoints.visible = false;
+    return;
+  }
+  // Never project scans into the map using stale or odom-only pose. That
+  // makes the laser visibly slide across walls and looks like bad nav even
+  // when the underlying issue is just a lagging localization estimate.
+  if (!localizationPoseFresh()) {
+    if (scanPoints) scanPoints.visible = false;
+    return;
+  }
+  const n = msg.ranges.length;
+  const positions = new Float32Array(n * 3);
+  let count = 0;
+  // Transform scan points from msg.header.frame_id (usually base_link) to map
+  // frame using the freshest localization estimate we have.
+  const [ox, oy, oyaw] = robotMapPose || [0, 0, 0];
+  for (let i = 0; i < n; i++) {
+    const r = msg.ranges[i];
+    if (!isFinite(r) || r < msg.range_min || r > msg.range_max) continue;
+    const angle = msg.angle_min + i * msg.angle_increment + oyaw;
+    positions[count*3]   = ox + r * Math.cos(angle);
+    positions[count*3+1] = oy + r * Math.sin(angle);
+    positions[count*3+2] = 0.05;
+    count++;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions.slice(0, count*3), 3));
+  if (scanPoints) { scene.remove(scanPoints); scanPoints.geometry.dispose(); }
+  scanPoints = new THREE.Points(geo, scanMat);
+  scanPoints.visible = true;
+  scene.add(scanPoints);
+}
+
+// ---- Nav path -------------------------------------------------------------
+let pathLine = null;
+const pathMat = new THREE.LineBasicMaterial({ color: 0x60a5fa, linewidth: 2 });
+function updatePath(msg) {
+  if (pathLine) { scene.remove(pathLine); pathLine.geometry.dispose(); pathLine = null; }
+  if (!document.getElementById('show-path').checked) return;
+  if (!msg.poses || msg.poses.length < 2) return;
+  const pts = msg.poses.map(p => new THREE.Vector3(p.pose.position.x, p.pose.position.y, 0.04));
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  pathLine = new THREE.Line(geo, pathMat);
+  scene.add(pathLine);
+}
+
+// ---- Frontier markers ------------------------------------------------------
+let frontierGroup = new THREE.Group();
+scene.add(frontierGroup);
+function updateFrontiers(msg) {
+  frontierGroup.clear();
+  if (!document.getElementById('show-frontiers').checked) return;
+  for (const m of msg.markers || []) {
+    if (m.action === 2) continue;  // delete
+    const color = m.color ? new THREE.Color(m.color.r, m.color.g, m.color.b) : new THREE.Color(0xfbbf24);
+    if (m.type === 8 /*POINTS*/) {
+      const pts = (m.points || []).map(p => new THREE.Vector3(p.x, p.y, 0.03));
+      if (!pts.length) continue;
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.PointsMaterial({ color, size: 0.08, sizeAttenuation: true });
+      frontierGroup.add(new THREE.Points(geo, mat));
+    } else if (m.type === 2 /*SPHERE*/) {
+      const s = m.scale?.x || 0.15;
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(s/2, 10, 10),
+        new THREE.MeshBasicMaterial({ color })
+      );
+      mesh.position.set(m.pose.position.x, m.pose.position.y, 0.05);
+      frontierGroup.add(mesh);
+    }
+  }
+}
+
+// ---- Render loop -----------------------------------------------------------
+let lastTime = performance.now(); let frames = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  if (viewMode === '3d') orbit.update(); else orthoOrbit.update();
+  renderer.render(scene, activeCamera);
+  frames++;
+  const now = performance.now();
+  if (now - lastTime > 1000) {
+    document.getElementById('fps-tag').textContent = `${frames} FPS`;
+    frames = 0; lastTime = now;
+  }
+}
+animate();
+
+// ==== ROS topics ============================================================
+new ROSLIB.Topic({ ros, name: '/map', messageType: 'nav_msgs/msg/OccupancyGrid', throttle_rate: 500 })
+  .subscribe(updateMap);
+
+new ROSLIB.Topic({ ros, name: '/scan_multi', messageType: 'sensor_msgs/msg/LaserScan', throttle_rate: 200 })
+  .subscribe(updateScan);
+
+new ROSLIB.Topic({ ros, name: '/plan', messageType: 'nav_msgs/msg/Path', throttle_rate: 500 })
+  .subscribe(updatePath);
+
+new ROSLIB.Topic({ ros, name: '/explore/frontiers', messageType: 'visualization_msgs/msg/MarkerArray', throttle_rate: 500 })
+  .subscribe(updateFrontiers);
+
+// Pose in MAP frame — drives both the robot marker AND the scan placement.
+// We prefer localization sources (`/pose` from slam_toolbox, `/amcl_pose`
+// from AMCL). /odom is only a startup fallback before we have any map-frame
+// estimate at all.
+let robotMapPose = [0, 0, 0];  // [x, y, yaw]
+let robotPoseSource = 'none';  // one of 'slam', 'amcl', 'odom', 'none'
+let lastLocalizedPoseAt = 0;
+
+function applyPose(p, q, source='unknown') {
+  const yaw = Math.atan2(2*(q.w*q.z + q.x*q.y), 1 - 2*(q.y*q.y + q.z*q.z));
+  robotMapPose = [p.x, p.y, yaw];
+  robotPoseSource = source;
+  robotGroup.position.set(p.x, p.y, 0.02);
+  robotGroup.rotation.z = yaw;
+  document.getElementById('pos-value').textContent = `${p.x.toFixed(2)}, ${p.y.toFixed(2)}`;
+  document.getElementById('yaw-value').textContent = `${(yaw * 180 / Math.PI).toFixed(0)}°`;
+}
+
+function applyLocalizedPose(p, q, source) {
+  lastLocalizedPoseAt = Date.now();
+  applyPose(p, q, source);
+}
+
+function localizationPoseFresh(maxAgeMs = 2000) {
+  return lastLocalizedPoseAt > 0 && (Date.now() - lastLocalizedPoseAt) <= maxAgeMs;
+}
+
+new ROSLIB.Topic({ ros, name: '/pose', messageType: 'geometry_msgs/msg/PoseWithCovarianceStamped', throttle_rate: 100 })
+  .subscribe((msg) => {
+    applyLocalizedPose(msg.pose.pose.position, msg.pose.pose.orientation, 'slam');
+  });
+
+new ROSLIB.Topic({ ros, name: '/amcl_pose', messageType: 'geometry_msgs/msg/PoseWithCovarianceStamped', throttle_rate: 100 })
+  .subscribe((msg) => {
+    applyLocalizedPose(msg.pose.pose.position, msg.pose.pose.orientation, 'amcl');
+  });
+
+new ROSLIB.Topic({ ros, name: '/odom', messageType: 'nav_msgs/msg/Odometry', throttle_rate: 200 })
+  .subscribe((msg) => {
+    // Velocity readouts always from /odom (MCU-sourced, frame-agnostic).
+    document.getElementById('lin-vel').textContent = `${Math.hypot(msg.twist.twist.linear.x, msg.twist.twist.linear.y).toFixed(2)} m/s`;
+    document.getElementById('ang-vel').textContent = `${msg.twist.twist.angular.z.toFixed(2)} rad/s`;
+    // Startup-only fallback before we have any localization in map frame.
+    // Once SLAM or AMCL has given us a map pose, keep that pose even if it
+    // goes stale; jumping back to /odom makes the robot appear to teleport.
+    if (lastLocalizedPoseAt === 0) {
+      applyPose(msg.pose.pose.position, msg.pose.pose.orientation, 'odom');
+    }
+  });
+
+new ROSLIB.Topic({ ros, name: '/teacher/fusion_state', messageType: 'std_msgs/msg/String', throttle_rate: 500 })
+  .subscribe((msg) => {
+    const m = msg.data.match(/nearest=([\d.]+)m/);
+    if (m) document.getElementById('nearest-obs').textContent = `${parseFloat(m[1]).toFixed(2)} m`;
+  });
+
+// Battery (3S LiPo on Yahboom M3 Pro): 12.6 V full, 11.1 V nominal, ~9.9 V cutoff.
+new ROSLIB.Topic({ ros, name: '/battery', messageType: 'std_msgs/msg/Float32', throttle_rate: 1000 })
+  .subscribe((msg) => {
+    const v = msg.data;
+    const pct = Math.round(Math.max(0, Math.min(100, (v - 9.9) / (12.6 - 9.9) * 100)));
+    const color = pct > 50 ? 'var(--green)' : pct > 20 ? 'var(--yellow)' : 'var(--red)';
+    document.getElementById('bat-volt').textContent = `${v.toFixed(2)} V`;
+    document.getElementById('bat-pct').textContent = `${pct}%`;
+    const bar = document.getElementById('bat-bar');
+    bar.style.width = `${pct}%`;
+    bar.style.background = color;
+  });
+
+// ==== Camera ===============================================================
+const camImg = document.getElementById('camera-feed');
+const camSel = document.getElementById('camera-select');
+let snapTimer = null;
+function refreshCamera() {
+  clearInterval(snapTimer); snapTimer = null;
+  const mode = camSel.value;
+  if (mode === 'off') { camImg.src = ''; camImg.alt = 'camera off'; return; }
+  if (mode === 'raw') { camImg.src = `/camera/stream?t=${Date.now()}`; }
+  else if (mode === 'snapshot') {
+    const tick = () => { camImg.src = `/camera/snapshot?t=${Date.now()}`; };
+    tick(); snapTimer = setInterval(tick, 200);
+  }
+}
+camSel.addEventListener('change', refreshCamera);
+refreshCamera();
+
+// ==== CONTROLS ==============================================================
+const cmdVelPub = new ROSLIB.Topic({ ros, name: '/cmd_vel', messageType: 'geometry_msgs/msg/Twist' });
+const goalPub   = new ROSLIB.Topic({ ros, name: '/goal_pose', messageType: 'geometry_msgs/msg/PoseStamped' });
+const exploreResumePub = new ROSLIB.Topic({ ros, name: '/explore/resume', messageType: 'std_msgs/msg/Bool' });
+// Nav2 cancel is a service on the action server, not a topic publish.
+const navCancelSvc = new ROSLIB.Service({
+  ros, name: '/navigate_to_pose/_action/cancel_goal',
+  serviceType: 'action_msgs/srv/CancelGoal',
+});
+// /initialpose — slam_toolbox subscribes to this; also the AMCL convention.
+const initialPosePub = new ROSLIB.Topic({
+  ros, name: '/initialpose',
+  messageType: 'geometry_msgs/msg/PoseWithCovarianceStamped',
+});
+const globalCostmapClearSvc = new ROSLIB.Service({
+  ros, name: '/global_costmap/clear_entirely_global_costmap',
+  serviceType: 'nav2_msgs/srv/ClearEntireCostmap',
+});
+const localCostmapClearSvc = new ROSLIB.Service({
+  ros, name: '/local_costmap/clear_entirely_local_costmap',
+  serviceType: 'nav2_msgs/srv/ClearEntireCostmap',
+});
+
+let exploring = false;
+function toggleExplore() {
+  exploring = !exploring;
+  exploreResumePub.publish(new ROSLIB.Message({ data: exploring }));
+  document.getElementById('btn-explore').textContent = exploring ? '⏸ Pause' : '▶ Explore';
+  document.getElementById('btn-explore').className = exploring ? 'btn-yellow' : 'btn-green';
+  document.getElementById('explore-tag').style.display = exploring ? '' : 'none';
+  log(exploring ? 'Exploration resumed' : 'Exploration paused', exploring ? 'ok' : 'info');
+}
+window.toggleExplore = toggleExplore;
+
+// Initial pose captured on first /odom — used as "home"
+let homePose = null;
+new ROSLIB.Topic({ ros, name: '/odom', messageType: 'nav_msgs/msg/Odometry' })
+  .subscribe(function onceOdom(msg) {
+    if (homePose) return;
+    const p = msg.pose.pose.position; const q = msg.pose.pose.orientation;
+    homePose = { x: p.x, y: p.y, qx: q.x, qy: q.y, qz: q.z, qw: q.w };
+    log(`Home pose captured: (${p.x.toFixed(2)}, ${p.y.toFixed(2)})`, 'info');
+    this.unsubscribe();
+  });
+
+function comeHome() {
+  if (!homePose) { log('Home pose not yet captured', 'err'); return; }
+  if (exploring) toggleExplore();  // stop exploration first
+  const goal = new ROSLIB.Message({
+    header: { frame_id: 'map' },
+    pose: {
+      position: { x: homePose.x, y: homePose.y, z: 0 },
+      orientation: { x: homePose.qx, y: homePose.qy, z: homePose.qz, w: homePose.qw }
+    }
+  });
+  goalPub.publish(goal);
+  log(`Return-home goal sent to (${homePose.x.toFixed(2)}, ${homePose.y.toFixed(2)})`, 'info');
+}
+window.comeHome = comeHome;
+
+function saveMap() {
+  // Write BOTH an occupancy grid pair (.pgm + .yaml) for viewers / AMCL,
+  // AND slam_toolbox's own serialization (.data + .posegraph) for re-loading
+  // in localization mode via our localize.launch.py.
+  const saveOccupancy = new ROSLIB.Service({
+    ros, name: '/slam_toolbox/save_map', serviceType: 'slam_toolbox/srv/SaveMap',
+  });
+  const serialize = new ROSLIB.Service({
+    ros, name: '/slam_toolbox/serialize_map', serviceType: 'slam_toolbox/srv/SerializePoseGraph',
+  });
+  // Persistent path (volume-mounted to /home/jetson/robot_maps on the host).
+  const base = '/root/maps/m3pro_map';
+  saveOccupancy.callService(new ROSLIB.ServiceRequest({ name: { data: base } }),
+    () => log(`Occupancy grid saved → ${base}.pgm / ${base}.yaml`, 'ok'),
+    (e) => log(`Occupancy save failed: ${e}`, 'err'));
+  serialize.callService(new ROSLIB.ServiceRequest({ filename: base }),
+    () => log(`Pose graph serialized → ${base}.data / ${base}.posegraph (persistent)`, 'ok'),
+    (e) => log(`Serialize failed: ${e} (OK if only using AMCL later)`, 'err'));
+}
+window.saveMap = saveMap;
+
+function abort() {
+  if (exploring) toggleExplore();
+  // Cancel ALL navigate_to_pose goals via the action-server cancel service.
+  // goal_info with all-zero goal_id + zero stamp = "cancel everything".
+  const req = new ROSLIB.ServiceRequest({
+    goal_info: { goal_id: { uuid: Array(16).fill(0) }, stamp: { sec: 0, nanosec: 0 } },
+  });
+  navCancelSvc.callService(req,
+    (res) => log(`Nav2 cancel: ${res.return_code === 0 ? 'OK' : `code ${res.return_code}`}`, 'info'),
+    (err) => log(`Nav2 cancel failed: ${err}`, 'err'));
+
+  // Zero-twist burst so the base doesn't coast.
+  const zero = new ROSLIB.Message({ linear: { x: 0, y: 0, z: 0 }, angular: { x: 0, y: 0, z: 0 } });
+  let n = 0;
+  const stopTimer = setInterval(() => {
+    cmdVelPub.publish(zero);
+    if (++n >= 5) clearInterval(stopTimer);
+  }, 100);
+  log('ABORT — nav cancelled, zero twist sent', 'err');
+}
+window.abort = abort;
+
+// ---- Re-localization via /initialpose ------------------------------------
+// slam_toolbox subscribes to /initialpose and snaps its pose estimate to the
+// value — this is how you recover after picking up the robot. This is NOT
+// a map reset (the built map stays). It's "SLAM, my actual position is HERE
+// now; use the laser scan to refine locally from here."
+function publishInitialPose(x, y, yaw) {
+  const qz = Math.sin(yaw / 2);
+  const qw = Math.cos(yaw / 2);
+  const now = Math.floor(Date.now() / 1000);
+  // 6x6 covariance diag [σx², σy², σz², σrx², σry², σrz²].
+  // Moderately tight — we're saying "I'm pretty sure about this click".
+  const cov = new Array(36).fill(0);
+  cov[0]  = 0.25;   // x
+  cov[7]  = 0.25;   // y
+  cov[14] = 9999;   // z (ignored)
+  cov[21] = 9999;   // roll (ignored)
+  cov[28] = 9999;   // pitch (ignored)
+  cov[35] = Math.PI * Math.PI / 9;  // yaw, ~±60°
+
+  initialPosePub.publish(new ROSLIB.Message({
+    header: { frame_id: 'map', stamp: { sec: now, nanosec: 0 } },
+    pose: {
+      pose: {
+        position: { x, y, z: 0 },
+        orientation: { x: 0, y: 0, z: qz, w: qw },
+      },
+      covariance: cov,
+    },
+  }));
+  log(`/initialpose published: (${x.toFixed(2)}, ${y.toFixed(2)}, ${(yaw * 180 / Math.PI).toFixed(0)}°) in map frame`, 'ok');
+  // Clear costmaps so Nav2 forgets stale obstacle memory relative to the old pose.
+  setTimeout(() => clearCostmaps(true), 400);
+}
+
+function setPoseOrigin() {
+  if (exploring) toggleExplore();
+  publishInitialPose(0, 0, 0);
+}
+window.setPoseOrigin = setPoseOrigin;
+
+// Set-pose-by-click mode: when active, the next click on the 3D viewer is
+// treated as the robot's actual position in the map frame.
+let setPoseArmed = false;
+function toggleSetPose() {
+  setPoseArmed = !setPoseArmed;
+  const btn = document.getElementById('btn-setpose');
+  btn.classList.toggle('btn-active', setPoseArmed);
+  if (setPoseArmed) {
+    log('Set-pose armed — click the 3D map where the robot actually is.', 'info');
+    canvas.style.cursor = 'crosshair';
+  } else {
+    canvas.style.cursor = '';
+  }
+}
+window.toggleSetPose = toggleSetPose;
+
+// Raycast any canvas click into the Z=0 map plane using the active camera.
+const _raycaster = new THREE.Raycaster();
+const _mapPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+const _hit = new THREE.Vector3();
+
+const pinGroup = new THREE.Group();
+scene.add(pinGroup);
+const pins = [];  // [{x,y,yaw,mesh}]
+
+// Build a label sprite with a number drawn on a canvas texture.
+function makeLabelSprite(text) {
+  const size = 128;
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const ctx2d = c.getContext('2d');
+  ctx2d.fillStyle = 'rgba(0,0,0,0.65)';
+  ctx2d.beginPath(); ctx2d.arc(size/2, size/2, size/2 - 4, 0, 2*Math.PI); ctx2d.fill();
+  ctx2d.strokeStyle = '#fbbf24'; ctx2d.lineWidth = 4;
+  ctx2d.beginPath(); ctx2d.arc(size/2, size/2, size/2 - 4, 0, 2*Math.PI); ctx2d.stroke();
+  ctx2d.fillStyle = '#fbbf24';
+  ctx2d.font = 'bold 72px -apple-system,sans-serif';
+  ctx2d.textAlign = 'center'; ctx2d.textBaseline = 'middle';
+  ctx2d.fillText(text, size/2, size/2 + 4);
+  const tex = new THREE.CanvasTexture(c);
+  tex.needsUpdate = true;
+  const mat = new THREE.SpriteMaterial({ map: tex, sizeAttenuation: false, depthTest: false });
+  const s = new THREE.Sprite(mat);
+  s.scale.set(0.08, 0.08, 0.08);  // size in normalized device coords (no attenuation)
+  return s;
+}
+
+function dropPin(x, y, yaw) {
+  const g = new THREE.Group();
+  // Vertical shaft.
+  const shaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.015, 0.015, 0.3, 8),
+    new THREE.MeshBasicMaterial({ color: 0xfbbf24 }),
+  );
+  shaft.rotation.x = Math.PI / 2;
+  shaft.position.z = 0.15;
+  g.add(shaft);
+  // Ring at base for visibility from top-down.
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.08, 0.12, 24),
+    new THREE.MeshBasicMaterial({ color: 0xfbbf24, side: THREE.DoubleSide }),
+  );
+  g.add(ring);
+  // Arrow showing goal heading.
+  const arrow = new THREE.Mesh(
+    new THREE.ConeGeometry(0.07, 0.18, 8),
+    new THREE.MeshBasicMaterial({ color: 0xfbbf24 }),
+  );
+  arrow.rotation.z = -Math.PI / 2;
+  arrow.position.set(0.17, 0, 0.03);
+  g.add(arrow);
+  // Numbered label above the pin.
+  const label = makeLabelSprite(String(pins.length + 1));
+  label.position.set(0, 0, 0.45);
+  g.add(label);
+  g.position.set(x, y, 0.03);
+  g.rotation.z = yaw;
+  pinGroup.add(g);
+  pins.push({ x, y, yaw, mesh: g, number: pins.length + 1 });
+}
+
+function clearPins() {
+  for (const p of pins) pinGroup.remove(p.mesh);
+  pins.length = 0;
+  log('Pins cleared', 'info');
+}
+window.clearPins = clearPins;
+
+function publishNavGoal(x, y, yaw) {
+  const qz = Math.sin(yaw / 2), qw = Math.cos(yaw / 2);
+  const now = Math.floor(Date.now() / 1000);
+  goalPub.publish(new ROSLIB.Message({
+    header: { frame_id: 'map', stamp: { sec: now, nanosec: 0 } },
+    pose: {
+      position: { x, y, z: 0 },
+      orientation: { x: 0, y: 0, z: qz, w: qw },
+    },
+  }));
+}
+
+function canvasHit(e) {
+  const r = canvas.getBoundingClientRect();
+  const ndc = new THREE.Vector2(
+    ((e.clientX - r.left) / r.width) * 2 - 1,
+    -((e.clientY - r.top) / r.height) * 2 + 1,
+  );
+  _raycaster.setFromCamera(ndc, activeCamera);
+  return _raycaster.ray.intersectPlane(_mapPlane, _hit) ? _hit : null;
+}
+
+// Right-click = drop nav goal. Suppress the browser context menu.
+canvas.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  const hit = canvasHit(e);
+  if (!hit) { log('Right-click missed the map plane.', 'err'); return; }
+  const yaw = robotMapPose ? Math.atan2(hit.y - robotMapPose[1], hit.x - robotMapPose[0]) : 0;
+  publishNavGoal(hit.x, hit.y, yaw);
+  dropPin(hit.x, hit.y, yaw);
+  log(`Pin #${pins.length}: nav goal (${hit.x.toFixed(2)}, ${hit.y.toFixed(2)})`, 'info');
+});
+
+// Left-click with shift (or while Set Pose is armed) = /initialpose.
+// Plain left-click does nothing — that's reserved for orbit/pan.
+canvas.addEventListener('click', (e) => {
+  if (!e.shiftKey && !setPoseArmed) return;
+  const hit = canvasHit(e);
+  if (!hit) { log('Click missed the map plane.', 'err'); return; }
+  let yaw = 0;
+  if (robotMapPose) yaw = Math.atan2(robotMapPose[1] - hit.y, robotMapPose[0] - hit.x);
+  publishInitialPose(hit.x, hit.y, yaw);
+  if (setPoseArmed) toggleSetPose();
+});
+
+function clearCostmaps(silent = false) {
+  const req = new ROSLIB.ServiceRequest({});
+  globalCostmapClearSvc.callService(req, () => {
+    if (!silent) log('Global costmap cleared', 'ok');
+  }, (e) => { if (!silent) log(`Global clear failed: ${e}`, 'err'); });
+  localCostmapClearSvc.callService(req, () => {
+    if (!silent) log('Local costmap cleared', 'ok');
+  }, (e) => { if (!silent) log(`Local clear failed: ${e}`, 'err'); });
+}
+window.clearCostmaps = clearCostmaps;
+
+// ==== TELEOP ================================================================
+let teleopOn = false;
+const keyState = { z:false, q:false, w:false, s:false, a:false, d:false, ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false, ' ':false };
+let teleopTimer = null;
+let maxLin = 0.20;
+const maxAng = 0.8;
+
+function setTeleop(on) {
+  teleopOn = on;
+  document.getElementById('teleop-tag').style.display = on ? '' : 'none';
+  document.getElementById('teleop-help').classList.toggle('on', on);
+  const btn = document.getElementById('btn-teleop');
+  btn.classList.toggle('btn-active', on);
+  btn.textContent = on ? '⌨ Teleop ON' : '⌨ Teleop';
+  if (on) {
+    teleopTimer = setInterval(publishTeleop, 100);
+  } else {
+    clearInterval(teleopTimer); teleopTimer = null;
+    cmdVelPub.publish(new ROSLIB.Message({ linear:{x:0,y:0,z:0}, angular:{x:0,y:0,z:0} }));
+  }
+  log(on ? 'Teleop engaged — click on the map area first' : 'Teleop disengaged', on ? 'info' : 'ok');
+}
+function toggleTeleop() { setTeleop(!teleopOn); }
+window.toggleTeleop = toggleTeleop;
+
+function publishTeleop() {
+  let lx = 0, az = 0;
+  if (keyState.z || keyState.w || keyState.ArrowUp) lx += maxLin;
+  if (keyState.s || keyState.ArrowDown)  lx -= maxLin;
+  if (keyState.q || keyState.a || keyState.ArrowLeft) az += maxAng;
+  if (keyState.d || keyState.ArrowRight) az -= maxAng;
+  if (keyState[' ']) { lx = 0; az = 0; }
+  cmdVelPub.publish(new ROSLIB.Message({
+    linear: { x: lx, y: 0, z: 0 }, angular: { x: 0, y: 0, z: az }
+  }));
+}
+document.addEventListener('keydown', (e) => {
+  if (!teleopOn) return;
+  if (e.key === 'Escape') { setTeleop(false); return; }
+  if (e.key in keyState) { keyState[e.key] = true; e.preventDefault(); }
+});
+document.addEventListener('keyup', (e) => {
+  if (e.key in keyState) { keyState[e.key] = false; }
+});
+window.addEventListener('blur', () => {
+  if (teleopOn) { for (const k of Object.keys(keyState)) keyState[k] = false; }
+});
+
+// ==== CONFIG MODAL ==========================================================
+const exploreParamSvc = new ROSLIB.Service({
+  ros, name: '/explore_node/set_parameters',
+  serviceType: 'rcl_interfaces/srv/SetParameters'
+});
+
+function rosServiceExists(name) {
+  return new Promise((resolve) => {
+    try {
+      ros.getServices(
+        (services) => resolve(Array.isArray(services) && services.includes(name)),
+        () => resolve(false),
+      );
+    } catch (_) {
+      resolve(false);
+    }
+  });
+}
+
+function openConfig()  {
+  const isMapping = (currentMode === 'mapping' || currentMode === 'explore' || currentMode === 'slam-nav');
+  if (!isMapping) {
+    log('Exploration tuning is only available in MAPPING mode.', 'info');
+    return;
+  }
+  document.getElementById('config-modal').classList.add('show');
+}
+function closeConfig() { document.getElementById('config-modal').classList.remove('show'); }
+window.openConfig = openConfig; window.closeConfig = closeConfig;
+
+for (const [id, valId] of [['cfg-gain','val-gain'],['cfg-potential','val-potential'],['cfg-min','val-min'],['cfg-vel','val-vel']]) {
+  const input = document.getElementById(id);
+  const out = document.getElementById(valId);
+  input.addEventListener('input', () => out.textContent = parseFloat(input.value).toFixed(2));
+}
+
+async function applyConfig() {
+  const isMapping = (currentMode === 'mapping' || currentMode === 'explore' || currentMode === 'slam-nav');
+  if (!isMapping) {
+    log('Skipped exploration param update: not in MAPPING mode.', 'info');
+    closeConfig();
+    return;
+  }
+
+  const hasSvc = await rosServiceExists('/explore_node/set_parameters');
+  if (!hasSvc) {
+    log('Skipped exploration param update: /explore_node is not available.', 'info');
+    closeConfig();
+    return;
+  }
+
+  const gain      = parseFloat(document.getElementById('cfg-gain').value);
+  const potential = parseFloat(document.getElementById('cfg-potential').value);
+  const minFront  = parseFloat(document.getElementById('cfg-min').value);
+  maxLin          = parseFloat(document.getElementById('cfg-vel').value);
+
+  const mkParam = (name, value) => ({
+    name, value: { type: 3, bool_value: false, integer_value: 0, double_value: value, string_value: '', byte_array_value: [], bool_array_value: [], integer_array_value: [], double_array_value: [], string_array_value: [] }
+  });
+  const req = new ROSLIB.ServiceRequest({
+    parameters: [
+      mkParam('gain_scale', gain),
+      mkParam('potential_scale', potential),
+      mkParam('min_frontier_size', minFront),
+    ]
+  });
+  exploreParamSvc.callService(req,
+    (res) => {
+      const ok = (res.results || []).every(r => r.successful);
+      log(ok ? `explore_node params updated (gain=${gain}, pot=${potential}, min=${minFront})` : 'Partial param failure',
+          ok ? 'ok' : 'err');
+    },
+    (e) => log(`Param update failed: ${e}`, 'err'));
+  closeConfig();
+}
+window.applyConfig = applyConfig;
+
+// ==== SAVED MAPS ===========================================================
+async function refreshMaps() {
+  try {
+    const res = await fetch('/maps');
+    const j = await res.json();
+    renderMapList(j.maps || []);
+  } catch (e) { log(`Map list failed: ${e.message}`, 'err'); }
+}
+window.refreshMaps = refreshMaps;
+
+function renderMapList(maps) {
+  const host = document.getElementById('map-list');
+  host.innerHTML = '';
+  if (!maps.length) {
+    host.innerHTML = '<div style="color:var(--dim);font-size:10.5px;text-align:center;padding:6px;">No saved maps yet — click 💾 Save…</div>';
+    return;
+  }
+  for (const m of maps) {
+    const when = m.mtime ? new Date(m.mtime * 1000).toLocaleString() : '—';
+    const kb = (m.size / 1024).toFixed(0);
+    const partsLabel = Object.keys(m.parts).sort().map(k => `.${k}`).join(' ');
+    const row = document.createElement('div');
+    row.style.cssText = 'display:grid;grid-template-columns:1fr auto auto;gap:4px;align-items:center;';
+    row.innerHTML = `
+      <div style="overflow:hidden;">
+        <div style="font-size:11.5px;font-weight:600;">${m.name}${m.loadable ? '' : ' <span style="color:var(--red-glow);font-weight:400;">(incomplete)</span>'}</div>
+        <div style="font-size:10px;color:var(--dim);">${kb} KB · ${when} · ${partsLabel}</div>
+      </div>
+      <button class="btn-blue" style="padding:4px 8px;font-size:10.5px;" ${m.loadable?'':'disabled'}
+              onclick="loadMap('${m.name.replace(/'/g,"\\'")}')" title="${m.loadable?'Switch to NAVIGATION mode with this map':'Need both .yaml and .pgm to load'}">▶ Load</button>
+      <button class="btn-gray" style="padding:4px 8px;font-size:10.5px;" onclick="deleteMap('${m.name.replace(/'/g,"\\'")}')" title="Delete">🗑</button>
+    `;
+    host.appendChild(row);
+  }
+}
+
+async function loadMap(name) {
+  if (!confirm(`Load map "${name}"?\n\nThis switches the stack to NAVIGATION mode and localizes with AMCL on the saved map.`)) return;
+  try {
+    const r = await fetch('/maps/load/' + encodeURIComponent(name), { method: 'POST' });
+    const j = await r.json();
+    if (j.ok) {
+      log(`Loading map '${name}' in navigation mode…`, 'info');
+      pollModeStatus();
+    } else {
+      log(`Load failed: ${j.error}`, 'err');
+    }
+  } catch (e) { log(`Load request failed: ${e.message}`, 'err'); }
+}
+window.loadMap = loadMap;
+
+async function deleteMap(name) {
+  if (!confirm(`Delete map "${name}"? This removes .pgm/.yaml/.data/.posegraph files.`)) return;
+  const r = await fetch('/maps/delete/' + encodeURIComponent(name), { method: 'POST' });
+  const j = await r.json();
+  if (j.ok) log(`Deleted ${j.removed?.length || 0} file(s) for '${name}'`, 'ok');
+  else log(`Delete failed: ${j.error}`, 'err');
+  refreshMaps();
+}
+window.deleteMap = deleteMap;
+
+// Save-as: prompt for name, then call /slam_toolbox/save_map + serialize_map
+// with the user's chosen base path. Overrides the default saveMap() hardcoded
+// to /root/maps/m3pro_map.
+async function saveMapAs() {
+  const name = prompt('Save map as (no extension):', 'map_' + new Date().toISOString().slice(0,16).replace(/[:T-]/g,''));
+  if (!name) return;
+  const safe = name.replace(/[^a-zA-Z0-9_\-.]/g, '_');
+  const base = `/root/maps/${safe}`;
+  const saveOccupancy = new ROSLIB.Service({
+    ros, name: '/slam_toolbox/save_map', serviceType: 'slam_toolbox/srv/SaveMap',
+  });
+  const serialize = new ROSLIB.Service({
+    ros, name: '/slam_toolbox/serialize_map', serviceType: 'slam_toolbox/srv/SerializePoseGraph',
+  });
+  saveOccupancy.callService(new ROSLIB.ServiceRequest({ name: { data: base } }),
+    () => log(`Occupancy grid → ${safe}.{pgm,yaml}`, 'ok'),
+    (e) => log(`Occupancy save failed: ${e}`, 'err'));
+  serialize.callService(new ROSLIB.ServiceRequest({ filename: base }),
+    () => { log(`Pose graph → ${safe}.{data,posegraph}`, 'ok'); setTimeout(refreshMaps, 800); },
+    (e) => log(`Serialize failed: ${e}`, 'err'));
+}
+window.saveMapAs = saveMapAs;
+
+refreshMaps();
+// Re-list periodically so new saves appear without manual refresh.
+setInterval(refreshMaps, 15000);
+
+// ==== ARM CONTROL ===========================================================
+// /arm6_joints is arm_msgs/ArmJoints with int16 fields joint1..joint6 + time(ms).
+// Units are hobby-servo degrees 0-180 (90 = center). We debounce per-slider
+// publishes to avoid spamming the microcontroller.
+const armPub = new ROSLIB.Topic({ ros, name: '/arm6_joints', messageType: 'arm_msgs/msg/ArmJoints' });
+const armJoints = [90, 90, 90, 90, 90, 90];
+const JOINT_NAMES = ['base', 'shoulder', 'elbow', 'wristP', 'wristR', 'grip'];
+const PRESETS = {
+  // neutral — arm straight up
+  center:     [90, 90, 90, 90, 90, 90],
+  // tilt arm so a wrist-mounted cam looks forward
+  camera_fwd: [90, 60, 45, 90, 90, 90],
+  // tilt arm so camera looks up
+  camera_up:  [90, 30, 60, 90, 90, 90],
+};
+
+function publishArm(timeMs = 800) {
+  const msg = new ROSLIB.Message({
+    joint1: armJoints[0]|0, joint2: armJoints[1]|0, joint3: armJoints[2]|0,
+    joint4: armJoints[3]|0, joint5: armJoints[4]|0, joint6: armJoints[5]|0,
+    time: timeMs|0,
+  });
+  armPub.publish(msg);
+}
+let armSendTimer = null;
+function scheduleArmSend() {
+  clearTimeout(armSendTimer);
+  armSendTimer = setTimeout(() => publishArm(600), 80);
+}
+
+function renderArmSliders() {
+  const host = document.getElementById('arm-sliders');
+  host.innerHTML = '';
+  JOINT_NAMES.forEach((name, i) => {
+    const row = document.createElement('div');
+    row.className = 'joint-row';
+    row.innerHTML = `
+      <label>J${i+1} ${name}</label>
+      <input type="range" min="0" max="180" step="1" value="${armJoints[i]}" data-idx="${i}">
+      <span class="jval" data-idx="${i}">${armJoints[i]}°</span>
+    `;
+    host.appendChild(row);
+    const input = row.querySelector('input');
+    const out   = row.querySelector('.jval');
+    input.addEventListener('input', () => {
+      const v = parseInt(input.value, 10);
+      armJoints[i] = v; out.textContent = `${v}°`;
+      scheduleArmSend();
+    });
+  });
+}
+renderArmSliders();
+
+function armPreset(name) {
+  const target = PRESETS[name]; if (!target) return;
+  for (let i = 0; i < 6; i++) armJoints[i] = target[i];
+  // sync UI
+  const host = document.getElementById('arm-sliders');
+  host.querySelectorAll('input[type=range]').forEach(inp => {
+    inp.value = armJoints[parseInt(inp.dataset.idx, 10)];
+  });
+  host.querySelectorAll('.jval').forEach(out => {
+    out.textContent = `${armJoints[parseInt(out.dataset.idx, 10)]}°`;
+  });
+  publishArm(1500);
+  log(`Arm preset: ${name}`, 'info');
+}
+window.armPreset = armPreset;
+
+// Mirror /joint_states back to the sliders so we see the real robot pose.
+new ROSLIB.Topic({ ros, name: '/joint_states', messageType: 'sensor_msgs/msg/JointState', throttle_rate: 500 })
+  .subscribe((msg) => {
+    if (!msg.name || !msg.position) return;
+    // Yahboom joints are named: base_yaw_joint, shoulder_joint, elbow_joint,
+    // wrist_pitch_joint, wrist_roll_joint, left_finger_joint (or similar).
+    const MAP = { base_yaw_joint: 0, shoulder_joint: 1, elbow_joint: 2,
+                  wrist_pitch_joint: 3, wrist_roll_joint: 4, left_finger_joint: 5 };
+    const host = document.getElementById('arm-sliders');
+    for (let k = 0; k < msg.name.length; k++) {
+      const i = MAP[msg.name[k]]; if (i === undefined) continue;
+      const deg = Math.round(90 + msg.position[k] * 180 / Math.PI);
+      // Only update UI when slider is not actively being dragged (no :active)
+      const inp = host.querySelector(`input[data-idx="${i}"]`);
+      if (inp && document.activeElement !== inp) {
+        inp.value = deg;
+        host.querySelector(`.jval[data-idx="${i}"]`).textContent = `${deg}°`;
+        armJoints[i] = deg;
+      }
+    }
+  });
+
+// ==== PUSH-TO-TALK + MIC STREAMING =========================================
+// Browser captures mic via MediaRecorder (Opus in WebM container), POSTs
+// each chunk to /mic/chunk which the web_server_node republishes on ROS
+// topic /teacher/mic_chunks (std_msgs/UInt8MultiArray) + /teacher/mic_meta.
+let micRec = null;
+let micStream = null;
+let pttActive = false;
+const pttBtn = document.getElementById('btn-ptt');
+const pttStat = document.getElementById('ptt-status');
+
+async function ensureMic() {
+  if (micStream) return true;
+  // Browsers gate getUserMedia to secure contexts (HTTPS or localhost).
+  // Opening http://<lan-ip>:8080 directly leaves navigator.mediaDevices === undefined.
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    const hint = location.hostname.match(/^(localhost|127\.|\[?::1)/)
+      ? 'Browser blocked mic access despite localhost — check browser permissions.'
+      : `Mic blocked: open this dashboard via http://localhost:8080 (SSH-forward 8080+9090) or serve over HTTPS. Current origin ${location.origin} is not a secure context.`;
+    log(hint, 'err');
+    pttStat.textContent = 'NO SECURE CTX';
+    pttStat.className = 'tag disconnected';
+    return false;
+  }
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }
+    });
+    return true;
+  } catch (err) {
+    log(`Mic permission denied: ${err.message}`, 'err');
+    pttStat.textContent = 'DENIED'; pttStat.className = 'tag disconnected';
+    return false;
+  }
+}
+
+async function pttDown(ev) {
+  if (ev) ev.preventDefault();
+  if (pttActive) return;
+  if (!(await ensureMic())) return;
+  pttActive = true;
+  pttBtn.classList.add('btn-active');
+  pttStat.textContent = 'LIVE';
+  pttStat.className = 'tag teleop-on';
+
+  const mimeCandidates = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/ogg;codecs=opus',
+  ];
+  const mime = mimeCandidates.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m));
+  if (!mime) { log('No supported mic mime type in this browser', 'err'); return; }
+  const rate = micStream.getAudioTracks()[0]?.getSettings().sampleRate || 48000;
+
+  micRec = new MediaRecorder(micStream, { mimeType: mime, audioBitsPerSecond: 32000 });
+  let sent = 0;
+  micRec.ondataavailable = async (e) => {
+    if (!e.data || e.data.size === 0) return;
+    const buf = await e.data.arrayBuffer();
+    try {
+      await fetch('/mic/chunk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'X-Mic-Mime': mime,
+          'X-Mic-Sample-Rate': String(rate),
+        },
+        body: buf,
+      });
+      sent++;
+    } catch (err) {
+      log(`Mic chunk POST failed: ${err.message}`, 'err');
+    }
+  };
+  micRec.onstop = () => {
+    log(`Mic stopped — ${sent} chunks sent`, 'ok');
+    pttBtn.classList.remove('btn-active');
+    pttStat.textContent = 'IDLE'; pttStat.className = 'tag mode';
+  };
+  micRec.start(250);  // 250 ms chunks → low latency
+  log(`Mic opened (${mime} @ ${rate} Hz)`, 'info');
+}
+window.pttDown = pttDown;
+
+function pttUp(ev) {
+  if (ev) ev.preventDefault();
+  if (!pttActive) return;
+  pttActive = false;
+  try { micRec && micRec.state === 'recording' && micRec.stop(); } catch (_) {}
+}
+window.pttUp = pttUp;
+
+// ==== MODE SWITCH (POST /mode/switch) =======================================
+async function switchMode(mode) {
+  if (!confirm(`Switch to ${mode.toUpperCase()} mode? This will restart the navigation stack.`)) return;
+  const tag = document.getElementById('mode-tag');
+  try {
+    const res = await fetch('/mode/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode, map: '/root/maps/m3pro_map' }),
+    });
+    const j = await res.json();
+    if (!j.ok) {
+      log(`Mode switch rejected: ${j.error || 'unknown'}`, 'err');
+      return;
+    }
+    log(`Switching to ${mode}…`, 'info');
+    pollModeStatus();
+  } catch (e) {
+    log(`Mode switch request failed: ${e.message}`, 'err');
+  }
+}
+window.switchMode = switchMode;
+
+let _modePollTimer = null;
+async function pollModeStatus() {
+  if (_modePollTimer) clearInterval(_modePollTimer);
+  const tag = document.getElementById('mode-tag');
+  let ticks = 0;
+  _modePollTimer = setInterval(async () => {
+    ticks++;
+    try {
+      const r = await fetch('/mode/status');
+      const s = await r.json();
+      if (s.pending) {
+        tag.textContent = `${s.pending.toUpperCase()}: ${s.progress}`;
+        tag.className = 'tag teleop-on';
+      } else {
+        applyMode(s.active);
+        tag.textContent = `MODE: ${s.active.toUpperCase()} — ${s.progress}`;
+        tag.className = s.ok ? 'tag connected' : 'tag disconnected';
+        if (s.finished_at > 0) {
+          log(s.ok
+              ? `✓ switched to ${s.active} in ${s.finished_at - s.started_at}s`
+              : `✗ mode switch failed: ${s.error} (last log: ${s.log_tail})`,
+              s.ok ? 'ok' : 'err');
+          clearInterval(_modePollTimer); _modePollTimer = null;
+          // Force dashboard to reconnect to rosbridge in case it dropped.
+          if (s.ok) setTimeout(() => location.reload(), 1500);
+        }
+      }
+    } catch (e) {
+      // rosbridge may be momentarily down during the switch — keep polling.
+    }
+    if (ticks > 60) { clearInterval(_modePollTimer); _modePollTimer = null; }
+  }, 1000);
+}
+
+let watchdogSeenAt = 0;
+async function refreshModeState() {
+  try {
+    const r = await fetch('/mode/status');
+    const s = await r.json();
+    if (s.pending) {
+      if (!_modePollTimer) pollModeStatus();
+      return;
+    }
+    if (Date.now() - watchdogSeenAt > 3000) {
+      applyMode(s.active);
+    }
+  } catch (_) {}
+}
+
+// "Reset SLAM" = restart the manual mapping stack.
+function resetSlam() {
+  const target = 'mapping';
+  if (!confirm('Reset SLAM by restarting manual MAPPING mode?')) return;
+  fetch('/mode/switch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode: target, map: '/root/maps/m3pro_map' }),
+  }).then(() => log(`Stack restarting in ${target} mode...`, 'info'))
+    .catch((e) => log(`Reset failed: ${e.message}`, 'err'));
+}
+window.resetSlam = resetSlam;
+
+// ==== HORN / BEEP PATTERNS ==================================================
+// /beep is std_msgs/UInt16. YB_Node interprets value: 0=off, 1=on briefly
+// (~50 ms). For rhythms we publish in scheduled sequences.
+const beepPub = new ROSLIB.Topic({ ros, name: '/beep', messageType: 'std_msgs/msg/UInt16' });
+let alarmTimer = null;
+const PATTERNS = {
+  //                [ [ms_on, ms_off], ... ]
+  single: [[200, 0]],
+  triple: [[120, 120], [120, 120], [120, 0]],
+  long:   [[900, 0]],
+  sos:    [[120,120],[120,120],[120,300],  // S = ...
+           [350,120],[350,120],[350,300],  // O = ---
+           [120,120],[120,120],[120,0]],   // S = ...
+};
+function playPatternOnce(seq) {
+  let t = 0;
+  for (const [on, off] of seq) {
+    setTimeout(() => beepPub.publish(new ROSLIB.Message({ data: 1 })), t);
+    t += on;
+    setTimeout(() => beepPub.publish(new ROSLIB.Message({ data: 0 })), t);
+    t += off;
+  }
+  return t;
+}
+function beepPattern(name) {
+  if (name === 'alarm') {
+    if (alarmTimer) {
+      clearInterval(alarmTimer); alarmTimer = null;
+      beepPub.publish(new ROSLIB.Message({ data: 0 }));
+      log('Alarm stopped', 'ok');
+      return;
+    }
+    alarmTimer = setInterval(() => playPatternOnce([[300, 300]]), 650);
+    log('Alarm started — click again to stop', 'err');
+    return;
+  }
+  const seq = PATTERNS[name];
+  if (!seq) return;
+  playPatternOnce(seq);
+  log(`Beep: ${name}`, 'info');
+}
+window.beepPattern = beepPattern;
+
+// ==== SOUNDBOARD ===========================================================
+// Uploaded files live on the robot under /root/sounds. Hotkey mapping (1-9 →
+// filename) is persisted in localStorage per-browser.
+const HOTKEY_STORE = 'm3pro.soundboard.hotkeys';
+let hotkeyBindings = {};
+try { hotkeyBindings = JSON.parse(localStorage.getItem(HOTKEY_STORE) || '{}'); } catch (_) {}
+
+async function refreshSounds() {
+  try {
+    const res = await fetch('/sounds');
+    const j = await res.json();
+    renderSoundSlots(j.sounds || []);
+  } catch (e) {
+    log(`Failed to list sounds: ${e.message}`, 'err');
+  }
+}
+window.refreshSounds = refreshSounds;
+
+function renderSoundSlots(sounds) {
+  const host = document.getElementById('sound-slots');
+  host.innerHTML = '';
+  if (!sounds.length) {
+    host.innerHTML = '<div style="grid-column:1/-1;color:var(--dim);font-size:10.5px;text-align:center;padding:4px;">No sounds uploaded yet</div>';
+    return;
+  }
+  sounds.forEach((s, i) => {
+    const slot = i + 1;
+    const hotkey = Object.entries(hotkeyBindings).find(([k, v]) => v === s.name)?.[0] || '';
+    const wrap = document.createElement('div');
+    wrap.style.display = 'flex';
+    wrap.style.gap = '2px';
+    wrap.innerHTML = `
+      <button class="btn-purple" style="padding:5px 6px;font-size:10.5px;flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+              title="Play ${s.name}" onclick="playSound('${s.name.replace(/'/g, "\\'")}')">
+        ${hotkey ? `[${hotkey}] ` : ''}${s.name}
+      </button>
+      <button class="btn-gray" style="padding:5px 6px;font-size:10px;" onclick="bindHotkey('${s.name.replace(/'/g, "\\'")}')" title="Bind hotkey (1-9)">🔢</button>
+      <button class="btn-gray" style="padding:5px 6px;font-size:10px;" onclick="deleteSound('${s.name.replace(/'/g, "\\'")}')" title="Delete">🗑</button>
+    `;
+    host.appendChild(wrap);
+  });
+}
+
+async function playSound(name) {
+  try {
+    await fetch(`/sounds/play/${encodeURIComponent(name)}`, { method: 'POST' });
+    log(`▶ ${name}`, 'ok');
+  } catch (e) { log(`Play failed: ${e.message}`, 'err'); }
+}
+window.playSound = playSound;
+
+async function deleteSound(name) {
+  if (!confirm(`Delete ${name}?`)) return;
+  await fetch(`/sounds/delete/${encodeURIComponent(name)}`, { method: 'POST' });
+  // also unbind any hotkey
+  for (const k of Object.keys(hotkeyBindings)) {
+    if (hotkeyBindings[k] === name) delete hotkeyBindings[k];
+  }
+  localStorage.setItem(HOTKEY_STORE, JSON.stringify(hotkeyBindings));
+  refreshSounds();
+}
+window.deleteSound = deleteSound;
+
+function bindHotkey(name) {
+  const k = prompt(`Hotkey for "${name}" (digit 1-9, empty to unbind):`, '');
+  if (k === null) return;
+  // Unbind any previous binding for this sound
+  for (const key of Object.keys(hotkeyBindings)) {
+    if (hotkeyBindings[key] === name) delete hotkeyBindings[key];
+  }
+  if (k && /^[1-9]$/.test(k)) hotkeyBindings[k] = name;
+  localStorage.setItem(HOTKEY_STORE, JSON.stringify(hotkeyBindings));
+  refreshSounds();
+}
+window.bindHotkey = bindHotkey;
+
+document.getElementById('sound-upload').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files);
+  for (const f of files) {
+    const buf = await f.arrayBuffer();
+    try {
+      const res = await fetch(`/sounds/upload?name=${encodeURIComponent(f.name)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: buf,
+      });
+      const j = await res.json();
+      if (j.ok) log(`✓ uploaded ${j.name} (${j.size} bytes)`, 'ok');
+      else log(`Upload failed: ${j.error}`, 'err');
+    } catch (err) { log(`Upload ${f.name} failed: ${err.message}`, 'err'); }
+  }
+  e.target.value = '';
+  refreshSounds();
+});
+
+// Keyboard shortcuts for soundboard (when NOT in teleop mode — teleop grabs W/A/S/D).
+document.addEventListener('keydown', (e) => {
+  if (teleopOn) return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (/^[1-9]$/.test(e.key) && hotkeyBindings[e.key]) {
+    playSound(hotkeyBindings[e.key]);
+  }
+});
+
+refreshSounds();
+
+// ==== WATCHDOG STATUS =======================================================
+// If the watchdog is running, treat it as the preferred source of service
+// health and mode state. On simpler deployments without watchdog, we fall
+// back to polling /mode/status over HTTP.
+const prevRestarts = {};
+let prevOdomAlive = null;
+new ROSLIB.Topic({ ros, name: '/teacher/watchdog/status', messageType: 'std_msgs/msg/String', throttle_rate: 800 })
+  .subscribe((msg) => {
+    watchdogSeenAt = Date.now();
+    let st; try { st = JSON.parse(msg.data); } catch(_) { return; }
+    if (!st || !st.services) return;
+
+    // Authoritative mode — override whatever probeMode() last guessed.
+    if (st.mode) applyMode(st.mode);
+
+    // Service badges: "b✓ c✓ m✗ d✓  |  odom✓ scan✓ batt✓"
+    const svcOrder = ['bringup', 'camera', 'mode', 'dashboard'];
+    const feedOrder = [['odom_raw', 'odom'], ['scan_multi', 'scan'], ['battery', 'batt']];
+    const parts = [];
+    let anyDown = false;
+    for (const k of svcOrder) {
+      const s = st.services?.[k];
+      if (!s) continue;
+      const icon = s.alive ? '✓' : '✗';
+      if (!s.alive) anyDown = true;
+      parts.push(`${k[0]}${icon}`);
+      const seen = prevRestarts[k];
+      if (seen !== undefined && s.restarts > seen) {
+        log(`watchdog: '${k}' restarted (now #${s.restarts})`, 'info');
+      }
+      prevRestarts[k] = s.restarts;
+    }
+    if (st.feeds) {
+      parts.push('|');
+      for (const [key, label] of feedOrder) {
+        const f = st.feeds[key];
+        if (!f) continue;
+        const icon = f.alive ? '✓' : '✗';
+        if (!f.alive) anyDown = true;
+        parts.push(`${label}${icon}`);
+      }
+    }
+    const tag = document.getElementById('watchdog-tag');
+    tag.textContent = parts.join(' ');
+    tag.className = anyDown ? 'tag disconnected' : 'tag connected';
+    if (st.mode_requested) {
+      tag.textContent = `switching → ${st.mode_requested}`;
+      tag.className = 'tag teleop-on';
+    }
+    // Extra: shout if MCU session drops (/odom_raw stale) — that's THE
+    // silent failure mode we kept hitting.
+    if (st.feeds?.odom_raw && !st.feeds.odom_raw.alive && prevOdomAlive !== false) {
+      log('⚠ /odom_raw has no publisher — MCU session likely dead. Run scripts/restart_microros_agent.sh', 'err');
+    }
+    prevOdomAlive = st.feeds?.odom_raw?.alive;
+  });
+
+// ==== MODE STATE ============================================================
+// Preferred source is /teacher/watchdog/status when available. Otherwise we
+// fall back to /mode/status, which infers the active mode from running
+// processes inside the container.
+let currentMode = 'unknown';
+function applyMode(mode) {
+  if (mode === currentMode) return;
+  const prev = currentMode;
+  currentMode = mode;
+
+  // Watchdog/internal/backend names → UI concept.
+  const isMapping    = (mode === 'mapping' || mode === 'explore' || mode === 'slam-nav');
+  const isNavigation = (mode === 'navigation');
+
+  const tag = document.getElementById('mode-tag');
+  tag.textContent = isMapping    ? 'MODE: MAPPING'
+                  : isNavigation ? 'MODE: NAVIGATION'
+                  :                'MODE: —';
+  tag.className = isNavigation ? 'tag connected' : 'tag mode';
+
+  document.getElementById('btn-explore').disabled = !isMapping;
+  document.getElementById('btn-explore').title = isMapping
+    ? 'Start / pause autonomous frontier exploration'
+    : 'Explore only available in MAPPING mode';
+
+  document.getElementById('btn-config').disabled = !isMapping;
+  document.getElementById('btn-config').title = isMapping
+    ? 'Tune explore_lite frontier parameters'
+    : 'Exploration tuning only available in MAPPING mode';
+
+  document.getElementById('btn-setpose').disabled = !isNavigation;
+  document.getElementById('btn-setpose').title = isNavigation
+    ? 'Click, then click the 3D map to tell the localizer where the robot really is.'
+    : 'Set Pose needs NAVIGATION mode (AMCL or localization stack active).';
+
+  log(`Mode: ${mode}`, 'info');
+
+  // FIRST time we learn we're in a mapping mode (coming from unknown or from
+  // navigation) → pause explore_lite by default. User has to click Explore
+  // to start autonomous motion. Publishing twice across a few seconds so
+  // we don't race with explore_lite's late subscription.
+  if (isMapping && prev !== 'explore' && prev !== 'slam-nav') {
+    const pause = () => {
+      try { exploreResumePub.publish(new ROSLIB.Message({ data: false })); } catch(_) {}
+    };
+    setTimeout(pause, 1500);
+    setTimeout(pause, 4000);
+    exploring = false;
+    const btn = document.getElementById('btn-explore');
+    btn.textContent = '▶ Explore';
+    btn.className = 'btn-green';
+    document.getElementById('explore-tag').style.display = 'none';
+  }
+
+  if (!isMapping) closeConfig();
+}
+
+setTimeout(refreshModeState, 250);
+setInterval(refreshModeState, 5000);
+log('Ready. URL param ?port=XXXX overrides rosbridge port (default 9090).', 'info');
+</script>
+
+</body>
+</html>

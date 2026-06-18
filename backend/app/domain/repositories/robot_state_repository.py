@@ -7,6 +7,7 @@ from app.domain.entities.robot import (
     EmergencyEvent,
     NavigationEtaTelemetry,
     RobotMode,
+    RobotRuntimeTelemetry,
     RobotStatus,
 )
 
@@ -19,6 +20,8 @@ class RobotStateRepository(Protocol):
     def set_mode(self, mode: RobotMode, mission_id: str | None = None) -> RobotStatus: ...
 
     def update_navigation_eta(self, telemetry: NavigationEtaTelemetry) -> RobotStatus: ...
+
+    def update_runtime(self, telemetry: RobotRuntimeTelemetry) -> RobotStatus: ...
 
     def get_navigation_eta(self, mission_id: str | None = None) -> NavigationEtaTelemetry | None: ...
 

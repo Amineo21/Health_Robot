@@ -9,11 +9,11 @@ export const Route = createFileRoute('/auth/forgot-password')({
 
 function ForgotPasswordPage() {
   return (
-    <AuthShell
-      eyebrow="Mot de passe oublié"
-      title="Réinitialiser l'accès"
-      description="Indique ton email pour lancer la procédure de réinitialisation."
-    >
+      <AuthShell
+        eyebrow="Mot de passe oublié"
+        title="Fonction non disponible"
+        description="Le backend MVP ne fournit pas de réinitialisation publique de mot de passe."
+      >
       <ForgotPasswordForm />
     </AuthShell>
   )
