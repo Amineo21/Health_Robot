@@ -86,6 +86,7 @@ class MqttRosbridgeBridge:
         self._latest_arm_lock = threading.Lock()
         self._latest_arm_joints = [90, 90, 90, 90, 90, 90]
         self._zero_twist_timers: list[threading.Timer] = []
+        self._teleop_stop_timer: threading.Timer | None = None
         self._emergency_active = False
 
     def start(self) -> None:
@@ -113,6 +114,9 @@ class MqttRosbridgeBridge:
 
     def stop(self) -> None:
         self._stop_event.set()
+        if self._teleop_stop_timer is not None:
+            self._teleop_stop_timer.cancel()
+            self._teleop_stop_timer = None
         for timer in self._zero_twist_timers:
             timer.cancel()
         self._zero_twist_timers.clear()
@@ -363,8 +367,11 @@ class MqttRosbridgeBridge:
         )
 
     def _schedule_zero_twist(self, delay_seconds: float) -> None:
+        if self._teleop_stop_timer is not None:
+            self._teleop_stop_timer.cancel()
         timer = threading.Timer(delay_seconds, self._publish_zero_twist_burst)
         timer.daemon = True
+        self._teleop_stop_timer = timer
         self._zero_twist_timers.append(timer)
         timer.start()
 
