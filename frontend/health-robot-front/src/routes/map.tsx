@@ -151,7 +151,7 @@ function MapPage() {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div>
-          <article className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+          <article className="sticky top-0 z-30 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h2 className="flex items-center gap-2 text-lg font-semibold"><MapPinned className="h-5 w-5 text-cyan-200" /> Carte ROS en direct</h2>
@@ -206,7 +206,7 @@ function MapPage() {
                   disabled={!isAdmin || isActionRunning}
                   className="inline-flex items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <Play className="mr-2 h-4 w-4" /> Start mapping
+                  <Play className="mr-2 h-4 w-4" /> Démarrer la cartographie
                 </button>
                 <button
                   type="button"
@@ -215,7 +215,7 @@ function MapPage() {
                   className="inline-flex items-center justify-center rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isActionRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  Save
+                  Sauvegarder
                 </button>
               </div>
               {!isAdmin && <p className="text-xs text-amber-200">Les actions mapping/save/load/delete sont réservées aux administrateurs.</p>}

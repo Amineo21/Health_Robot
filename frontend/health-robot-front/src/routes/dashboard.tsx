@@ -38,7 +38,7 @@ function DashboardPage() {
     },
     {
       label: 'Vitesse actuelle',
-      value: `${backendStatus?.current_speed_mps ?? 0} m/s`,
+      value: `${(backendStatus?.current_speed_mps ?? 0).toFixed(4)} m/s`,
       icon: Gauge,
     },
     {
