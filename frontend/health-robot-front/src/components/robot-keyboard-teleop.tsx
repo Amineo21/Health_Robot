@@ -72,6 +72,7 @@ export function RobotKeyboardTeleop({
       next.delete(direction)
     }
     setDirections(next)
+    void publishTeleopPayload(buildTeleopPayload(next), true)
   }
 
   const stopTeleop = () => {

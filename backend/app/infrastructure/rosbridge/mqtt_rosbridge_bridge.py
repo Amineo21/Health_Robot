@@ -81,6 +81,7 @@ class MqttRosbridgeBridge:
         self._websocket_connected = False
         self._websocket_lock = threading.Lock()
         self._service_call_lock = threading.Lock()
+        self._mqtt_reconnect_lock = threading.Lock()
         self._service_calls: dict[str, dict[str, Any]] = {}
         self._latest_map_lock = threading.Lock()
         self._latest_map_snapshot: dict[str, Any] | None = None
@@ -89,6 +90,8 @@ class MqttRosbridgeBridge:
         self._zero_twist_timers: list[threading.Timer] = []
         self._teleop_stop_timer: threading.Timer | None = None
         self._emergency_active = False
+        self._mqtt_connected = False
+        self._mqtt_reconnect_running = False
 
     def start(self) -> None:
         if not self._settings.robot_rosbridge_enabled:
@@ -167,15 +170,43 @@ class MqttRosbridgeBridge:
 
     def _handle_mqtt_connect(self, client: mqtt.Client, userdata: Any, flags: dict[str, Any], rc: int) -> None:
         if rc != 0:
+            self._mqtt_connected = False
             logger.warning("Connexion MQTT du pont rosbridge refusee rc=%s", rc)
             return
+        self._mqtt_connected = True
         for topic, qos in COMMAND_SUBSCRIPTIONS:
             client.subscribe(topic, qos=qos)
         logger.info("Pont rosbridge abonne aux commandes MQTT")
 
     def _handle_mqtt_disconnect(self, client: mqtt.Client, userdata: Any, rc: int) -> None:
+        self._mqtt_connected = False
         if rc != 0:
             logger.warning("Pont rosbridge deconnecte de MQTT rc=%s", rc)
+            self._start_mqtt_reconnect_loop()
+
+    def _start_mqtt_reconnect_loop(self) -> None:
+        if self._stop_event.is_set():
+            return
+        with self._mqtt_reconnect_lock:
+            if self._mqtt_reconnect_running:
+                return
+            self._mqtt_reconnect_running = True
+
+        thread = threading.Thread(target=self._run_mqtt_reconnect_loop, daemon=True)
+        thread.start()
+
+    def _run_mqtt_reconnect_loop(self) -> None:
+        try:
+            while not self._stop_event.is_set() and not self._mqtt_connected:
+                try:
+                    self._mqtt_client.reconnect()
+                    return
+                except OSError as exc:
+                    logger.warning("Reconnexion MQTT du pont rosbridge impossible: %s", exc)
+                    time.sleep(3)
+        finally:
+            with self._mqtt_reconnect_lock:
+                self._mqtt_reconnect_running = False
 
     def _handle_mqtt_message(self, client: mqtt.Client, userdata: Any, message: mqtt.MQTTMessage) -> None:
         try:
