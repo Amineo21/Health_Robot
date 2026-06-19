@@ -19,6 +19,7 @@ from app.domain.entities.mqtt_topics import (
     ROBOT_EMERGENCY_TOPIC,
     ROBOT_NAV2_FEEDBACK_TOPIC,
     ROBOT_NAV2_PATH_TOPIC,
+    ROBOT_POSE_TOPIC,
     ROBOT_STATUS_TOPIC,
 )
 
@@ -49,6 +50,10 @@ class HandleMqttMessageUseCase:
 
         if topic == ROBOT_STATUS_TOPIC:
             self._handle_robot_status_payload(payload)
+            return
+
+        if topic == ROBOT_POSE_TOPIC:
+            self._handle_robot_status_payload(payload if "pose" in payload else {"pose": payload})
             return
 
         if topic == ROBOT_EMERGENCY_TOPIC:

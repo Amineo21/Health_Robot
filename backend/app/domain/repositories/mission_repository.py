@@ -1,0 +1,19 @@
+from __future__ import annotations
+
+from typing import Protocol
+
+from app.domain.entities.mission import Mission
+
+
+class MissionRepository(Protocol):
+    def create_mission(self, mission: Mission) -> Mission: ...
+
+    def update_mission(self, mission: Mission) -> Mission: ...
+
+    def get_mission(self, mission_id: str) -> Mission | None: ...
+
+    def list_missions(self, include_terminal: bool = False, limit: int = 100) -> list[Mission]: ...
+
+    def get_active_mission(self) -> Mission | None: ...
+
+    def get_oldest_pending_mission(self) -> Mission | None: ...

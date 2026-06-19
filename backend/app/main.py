@@ -23,6 +23,7 @@ from app.application.use_cases.get_robot_status import GetRobotStatusUseCase
 from app.application.use_cases.get_settings import GetSettingsUseCase
 from app.application.use_cases.handle_mqtt_message import HandleMqttMessageUseCase
 from app.application.use_cases.list_users import ListUsersUseCase
+from app.application.use_cases.mission_orchestrator import MissionOrchestrator
 from app.application.use_cases.process_battery_telemetry import ProcessBatteryTelemetryUseCase
 from app.application.use_cases.process_emergency_telemetry import ProcessEmergencyTelemetryUseCase
 from app.application.use_cases.process_navigation_eta import ProcessNavigationEtaUseCase
@@ -44,6 +45,8 @@ from app.infrastructure.rosbridge.mqtt_rosbridge_bridge import MqttRosbridgeBrid
 from app.infrastructure.repositories.in_memory_settings_repository import InMemorySettingsRepository
 from app.infrastructure.repositories.in_memory_user_repository import InMemoryUserRepository
 from app.infrastructure.repositories.in_memory_robot_state_repository import InMemoryRobotStateRepository
+from app.infrastructure.repositories.in_memory_mission_repository import InMemoryMissionRepository
+from app.infrastructure.repositories.sqlalchemy_mission_repository import SqlAlchemyMissionRepository
 from app.infrastructure.repositories.sqlalchemy_settings_repository import SqlAlchemySettingsRepository
 from app.infrastructure.repositories.sqlalchemy_user_repository import SqlAlchemyUserRepository
 from app.infrastructure.security.jwt_token_service import JwtTokenService
@@ -77,6 +80,18 @@ OPENAPI_TAGS = [
     {
         "name": "robot commands",
         "description": "Authenticated robot commands published to MQTT for the robot rosbridge adapter.",
+    },
+    {
+        "name": "annotated points",
+        "description": "Admin-managed reusable map points for stock, delivery rooms, and robot base.",
+    },
+    {
+        "name": "missions",
+        "description": "CareBot delivery mission creation, queueing, confirmations, and cancellation.",
+    },
+    {
+        "name": "robot screen",
+        "description": "Read-only robot onboard screen status protected by a dedicated token.",
     },
     {
         "name": "navigation",
@@ -131,6 +146,16 @@ def create_settings_repository(default_settings: RobotSettings) -> SettingsRepos
     raise ValueError("SETTINGS_REPOSITORY_BACKEND must be 'memory' or 'database'")
 
 
+def create_mission_repository():
+    if settings.mission_repository_backend == "memory":
+        return InMemoryMissionRepository()
+
+    if settings.mission_repository_backend == "database":
+        return SqlAlchemyMissionRepository(session_factory=SessionLocal)
+
+    raise ValueError("MISSION_REPOSITORY_BACKEND must be 'memory' or 'database'")
+
+
 def create_app() -> FastAPI:
     robot_state_repository = InMemoryRobotStateRepository()
     password_hasher = PasswordHasher()
@@ -142,6 +167,7 @@ def create_app() -> FastAPI:
     )
     user_repository = create_user_repository(password_hasher)
     settings_repository = create_settings_repository(create_default_robot_settings())
+    mission_repository = create_mission_repository()
     mqtt_service = MQTTService(settings=settings)
     robot_rosbridge_bridge = MqttRosbridgeBridge(settings=settings)
     robot_dashboard_client = RobotDashboardClient(settings.robot_dashboard_url)
@@ -158,15 +184,26 @@ def create_app() -> FastAPI:
         low_battery_threshold=settings.low_battery_threshold,
         auto_return_enabled=settings.auto_return_enabled,
     )
-    process_emergency_telemetry = ProcessEmergencyTelemetryUseCase(robot_state_repository)
-    process_robot_status_telemetry = ProcessRobotStatusTelemetryUseCase(robot_state_repository)
+    mission_orchestrator = MissionOrchestrator(
+        annotated_points=mission_repository,
+        missions=mission_repository,
+        command_publisher=robot_command_publisher,
+        message_publisher=mqtt_service,
+        state_repository=robot_state_repository,
+        settings_repository=settings_repository,
+        arrival_radius_m=settings.mission_arrival_radius_m,
+    )
+    process_emergency_telemetry = ProcessEmergencyTelemetryUseCase(robot_state_repository, mission_orchestrator)
+    process_robot_status_telemetry = ProcessRobotStatusTelemetryUseCase(robot_state_repository, mission_orchestrator)
     trigger_emergency_stop = TriggerEmergencyStopUseCase(
         state_repository=robot_state_repository,
         message_publisher=mqtt_service,
+        mission_orchestrator=mission_orchestrator,
     )
     clear_emergency = ClearEmergencyUseCase(
         state_repository=robot_state_repository,
         message_publisher=mqtt_service,
+        mission_orchestrator=mission_orchestrator,
     )
     use_cases = ApplicationUseCases(
         get_robot_status=GetRobotStatusUseCase(robot_state_repository),
@@ -195,6 +232,9 @@ def create_app() -> FastAPI:
             state_repository=robot_state_repository,
             settings_repository=settings_repository,
         ),
+        annotated_points=mission_repository,
+        missions=mission_repository,
+        mission_orchestrator=mission_orchestrator,
     )
     handle_mqtt_message = HandleMqttMessageUseCase(
         process_battery_telemetry=process_battery_telemetry,

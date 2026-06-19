@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { setAccessToken } from './api'
-import { commandRobotArm, fetchCurrentRobotMap, fetchRobotCameraSnapshot, loadSavedRobotMap, navigateToPosition, returnBase, saveCurrentRobotMap, sendTeleop, setPoseOrigin, uploadRobotSound } from './robot-api'
+import { commandRobotArm, createAnnotatedPoint, createMission, fetchAnnotatedPoints, fetchCurrentRobotMap, fetchRobotCameraSnapshot, fetchRobotScreenStatus, loadSavedRobotMap, navigateToPosition, returnBase, saveCurrentRobotMap, sendTeleop, setPoseOrigin, updateStockPointSupplies, uploadRobotSound } from './robot-api'
 
 const fetchMock = vi.fn()
 
@@ -127,5 +127,58 @@ describe('robot-api', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:4000/api/robot/arm')
     expect(init.method).toBe('POST')
     expect(JSON.parse(init.body as string)).toEqual({ joint1: 90, joint2: 60, joint3: 45, joint4: 90, joint5: 90, joint6: 90, time_ms: 1200 })
+  })
+
+  it('fetches annotated delivery points through backend', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([]))
+
+    await fetchAnnotatedPoints({ type: 'DELIVERY_ROOM', active_only: true })
+
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:4000/api/annotated-points?type=DELIVERY_ROOM&active_only=true')
+  })
+
+  it('creates annotated points through backend', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: 'pt-1' }))
+
+    await createAnnotatedPoint({ name: 'Chambre 203', type: 'DELIVERY_ROOM', x: 3, y: 4, yaw: 0 })
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:4000/api/annotated-points')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body as string)).toEqual({ name: 'Chambre 203', type: 'DELIVERY_ROOM', x: 3, y: 4, yaw: 0 })
+  })
+
+  it('updates stock supplies through backend', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([]))
+
+    await updateStockPointSupplies('pt-1', [{ supply_type: 'gants', priority_order: 1 }])
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:4000/api/annotated-points/pt-1/supplies')
+    expect(init.method).toBe('PUT')
+    expect(JSON.parse(init.body as string)).toEqual({ supplies: [{ supply_type: 'gants', priority_order: 1 }] })
+  })
+
+  it('creates missions through backend', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: 'mis-1', status: 'NAVIGATING_TO_STOCK' }))
+
+    await createMission({ supply_type: 'gants', delivery_room_id: 'pt-room' })
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:4000/api/missions')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body as string)).toEqual({ supply_type: 'gants', delivery_room_id: 'pt-room' })
+  })
+
+  it('fetches robot screen status with dedicated token only', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ robot_state: 'IDLE', screen_title_fr: 'CareBot' }))
+
+    await fetchRobotScreenStatus('screen-token')
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit
+    const headers = init.headers as Record<string, string>
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:4000/api/robot-screen/status')
+    expect(headers['X-Robot-Screen-Token']).toBe('screen-token')
+    expect(headers.Authorization).toBeUndefined()
   })
 })
