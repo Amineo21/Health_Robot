@@ -71,6 +71,9 @@ class Settings:
         "SETTINGS_REPOSITORY_BACKEND",
         os.getenv("USER_REPOSITORY_BACKEND", "memory"),
     )
+    mission_repository_backend: str = os.getenv("MISSION_REPOSITORY_BACKEND", "database")
+    mission_arrival_radius_m: float = float(os.getenv("MISSION_ARRIVAL_RADIUS_M", "0.60"))
+    robot_screen_token: Optional[str] = os.getenv("ROBOT_SCREEN_TOKEN")
 
 
 settings = Settings()

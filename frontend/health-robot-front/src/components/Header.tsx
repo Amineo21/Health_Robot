@@ -1,4 +1,4 @@
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useState } from 'react'
 import { Activity, Gamepad2, Home, LayoutDashboard, LogIn, LogOut, Map, Menu, Settings, Shield, Users, X } from 'lucide-react'
 
@@ -19,10 +19,15 @@ const adminLinks = [
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
   const { user, isAuthenticated, logout } = useAuth()
   const navigate = useNavigate()
   const isAdmin = canUseAdminControls(user)
   const visibleLinks = isAuthenticated ? [...authenticatedLinks, ...(isAdmin ? adminLinks : [])] : []
+
+  if (pathname === '/robot-screen') {
+    return null
+  }
 
   const handleLogout = async () => {
     await logout()

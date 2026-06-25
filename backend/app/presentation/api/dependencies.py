@@ -93,3 +93,22 @@ def require_robot_api_key(api_key: Annotated[str | None, Header(alias="X-Robot-A
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Robot API key is not configured")
     if not hmac.compare_digest(api_key or "", settings.robot_api_key):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid robot API key")
+
+
+def require_robot_screen_token(
+    token: Annotated[str | None, Header(alias="X-Robot-Screen-Token")] = None,
+    authorization: Annotated[str | None, Header(alias="Authorization")] = None,
+) -> None:
+    configured_token = settings.robot_screen_token
+    if configured_token is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Robot screen token is not configured")
+
+    provided_token = token or ""
+    if not provided_token and authorization and authorization.lower().startswith("bearer "):
+        provided_token = authorization[7:].strip()
+
+    if not hmac.compare_digest(provided_token, configured_token):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid robot screen token")
+
+
+RobotScreenTokenDep = Annotated[None, Depends(require_robot_screen_token)]

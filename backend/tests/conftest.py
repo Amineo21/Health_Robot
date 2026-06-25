@@ -8,6 +8,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 os.environ.setdefault("MQTT_ENABLED", "false")
+os.environ.setdefault("MISSION_REPOSITORY_BACKEND", "memory")
+os.environ.setdefault("ROBOT_SCREEN_TOKEN", "robot-screen-test-token")
 
 from app.main import create_app
 from tests.helpers import ADMIN_EMAIL, ADMIN_PASSWORD, CAREGIVER_PASSWORD, auth_headers, login

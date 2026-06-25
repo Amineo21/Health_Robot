@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.application.use_cases.mission_orchestrator import MissionOrchestrator
 from app.domain.entities.mqtt_topics import ROBOT_COMMAND_TOPIC, ROBOT_EMERGENCY_TOPIC, ROBOT_UI_ALERTS_TOPIC
 from app.domain.entities.robot import EmergencyEvent, EmergencyStopRequest, Severity
 from app.domain.repositories.message_publisher import MessagePublisher
@@ -7,9 +8,15 @@ from app.domain.repositories.robot_state_repository import RobotStateRepository
 
 
 class TriggerEmergencyStopUseCase:
-    def __init__(self, state_repository: RobotStateRepository, message_publisher: MessagePublisher) -> None:
+    def __init__(
+        self,
+        state_repository: RobotStateRepository,
+        message_publisher: MessagePublisher,
+        mission_orchestrator: MissionOrchestrator | None = None,
+    ) -> None:
         self._state_repository = state_repository
         self._message_publisher = message_publisher
+        self._mission_orchestrator = mission_orchestrator
 
     def execute(self, request: EmergencyStopRequest) -> EmergencyEvent:
         event = EmergencyEvent(
@@ -18,6 +25,8 @@ class TriggerEmergencyStopUseCase:
             requires_admin_restart=request.requires_admin_restart,
         )
         self._state_repository.trigger_emergency(event)
+        if self._mission_orchestrator is not None:
+            self._mission_orchestrator.fail_active_mission("emergency_stop")
         self._message_publisher.publish_json(
             ROBOT_COMMAND_TOPIC,
             {

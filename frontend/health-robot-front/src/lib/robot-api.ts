@@ -109,6 +109,96 @@ export interface RobotArmState {
   joints: number[]
 }
 
+export type SupplyType = 'serviettes' | 'papier_toilette' | 'gants' | 'protections' | 'linge'
+export type AnnotatedPointType = 'STOCK' | 'DELIVERY_ROOM' | 'ROBOT_BASE'
+export type MissionStatus =
+  | 'PENDING'
+  | 'NAVIGATING_TO_STOCK'
+  | 'WAITING_FOR_RECOVERY_CONFIRMATION'
+  | 'NAVIGATING_TO_DELIVERY'
+  | 'WAITING_FOR_DELIVERY_CONFIRMATION'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'FAILED'
+
+export interface AnnotatedPoint {
+  id: string
+  name: string
+  type: AnnotatedPointType
+  x: number
+  y: number
+  yaw: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface AnnotatedPointPayload {
+  name: string
+  type: AnnotatedPointType
+  x: number
+  y: number
+  yaw: number
+  is_active?: boolean
+}
+
+export interface StockPointSupply {
+  stock_point_id: string
+  supply_type: SupplyType
+  priority_order: number
+  is_active: boolean
+}
+
+export interface StockPointSupplyPayload {
+  supply_type: SupplyType
+  priority_order: number
+  is_active?: boolean
+}
+
+export interface Mission {
+  id: string
+  status: MissionStatus
+  supply_type: SupplyType
+  delivery_room_id: string
+  delivery_room_name_snapshot: string
+  delivery_x_snapshot: number
+  delivery_y_snapshot: number
+  delivery_yaw_snapshot: number
+  stock_point_id: string
+  stock_point_name_snapshot: string
+  stock_x_snapshot: number
+  stock_y_snapshot: number
+  stock_yaw_snapshot: number
+  created_by_user_id: string
+  created_by_name_snapshot: string
+  created_at: string
+  started_at?: string | null
+  arrived_at_stock_at?: string | null
+  recovery_confirmed_at?: string | null
+  recovery_confirmed_by_user_id?: string | null
+  arrived_at_delivery_at?: string | null
+  delivery_confirmed_at?: string | null
+  delivery_confirmed_by_user_id?: string | null
+  completed_at?: string | null
+  cancelled_at?: string | null
+  cancelled_by_user_id?: string | null
+  failure_reason?: string | null
+  updated_at: string
+}
+
+export interface RobotScreenStatus {
+  robot_state: string
+  screen_title_fr: string
+  screen_message_fr: string
+  current_mission: {
+    id: string
+    status: MissionStatus
+    supply_label_fr: string
+    destination_label_fr: string
+  } | null
+  updated_at: string
+}
+
 export interface NavigatePayload {
   x: number
   y: number
@@ -221,6 +311,95 @@ export function resetEmergency() {
   return apiFetch<{ status: string }>('/api/safety/emergency/reset?actor=frontend', {
     method: 'POST',
   })
+}
+
+export function fetchAnnotatedPoints(params: { type?: AnnotatedPointType; active_only?: boolean } = {}) {
+  const search = new URLSearchParams()
+  if (params.type) search.set('type', params.type)
+  if (params.active_only !== undefined) search.set('active_only', String(params.active_only))
+  const query = search.toString()
+  return apiFetch<AnnotatedPoint[]>(`/api/annotated-points${query ? `?${query}` : ''}`)
+}
+
+export function createAnnotatedPoint(payload: AnnotatedPointPayload) {
+  return apiFetch<AnnotatedPoint>('/api/annotated-points', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function updateAnnotatedPoint(pointId: string, payload: Partial<AnnotatedPointPayload>) {
+  return apiFetch<AnnotatedPoint>(`/api/annotated-points/${encodeURIComponent(pointId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function deactivateAnnotatedPoint(pointId: string) {
+  return apiFetch<AnnotatedPoint>(`/api/annotated-points/${encodeURIComponent(pointId)}`, {
+    method: 'DELETE',
+  })
+}
+
+export function updateStockPointSupplies(pointId: string, supplies: StockPointSupplyPayload[]) {
+  return apiFetch<StockPointSupply[]>(`/api/annotated-points/${encodeURIComponent(pointId)}/supplies`, {
+    method: 'PUT',
+    body: JSON.stringify({ supplies }),
+  })
+}
+
+export function fetchStockPointSupplies(pointId: string) {
+  return apiFetch<StockPointSupply[]>(`/api/annotated-points/${encodeURIComponent(pointId)}/supplies`)
+}
+
+export function fetchMissions(params: { include_terminal?: boolean; limit?: number } = {}) {
+  const search = new URLSearchParams()
+  if (params.include_terminal !== undefined) search.set('include_terminal', String(params.include_terminal))
+  if (params.limit !== undefined) search.set('limit', String(params.limit))
+  const query = search.toString()
+  return apiFetch<Mission[]>(`/api/missions${query ? `?${query}` : ''}`)
+}
+
+export function createMission(payload: { supply_type: SupplyType; delivery_room_id: string }) {
+  return apiFetch<Mission>('/api/missions', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function confirmMissionRecovery(missionId: string) {
+  return apiFetch<Mission>(`/api/missions/${encodeURIComponent(missionId)}/confirm-recovery`, {
+    method: 'POST',
+  })
+}
+
+export function confirmMissionDelivery(missionId: string) {
+  return apiFetch<Mission>(`/api/missions/${encodeURIComponent(missionId)}/confirm-delivery`, {
+    method: 'POST',
+  })
+}
+
+export function cancelMission(missionId: string) {
+  return apiFetch<Mission>(`/api/missions/${encodeURIComponent(missionId)}/cancel`, {
+    method: 'POST',
+  })
+}
+
+export async function fetchRobotScreenStatus(token: string) {
+  const response = await fetch(resolveApiUrl('/api/robot-screen/status'), {
+    headers: {
+      Accept: 'application/json',
+      'X-Robot-Screen-Token': token,
+    },
+  })
+
+  if (!response.ok) {
+    const contentType = response.headers.get('content-type') ?? ''
+    const data = contentType.includes('application/json') ? await response.json().catch(() => undefined) : await response.text()
+    throw new ApiError(getRawErrorMessage(data, response.statusText || 'Erreur API'), response.status, data)
+  }
+
+  return response.json() as Promise<RobotScreenStatus>
 }
 
 export function fetchCurrentRobotMap() {
