@@ -10,6 +10,7 @@ from app.application.dto.robot_dto import (
     RobotMapMetadata as RobotMapMetadataDto,
     RobotRuntimeTelemetry as RobotRuntimeTelemetryDto,
 )
+from app.application.use_cases.mission_orchestrator import MissionOrchestrator
 from app.application.use_cases.process_battery_telemetry import ProcessBatteryTelemetryUseCase
 from app.application.use_cases.process_emergency_telemetry import ProcessEmergencyTelemetryUseCase
 from app.application.use_cases.process_navigation_eta import ProcessNavigationEtaUseCase
@@ -17,6 +18,7 @@ from app.application.use_cases.process_robot_status_telemetry import ProcessRobo
 from app.domain.entities.mqtt_topics import (
     ROBOT_BATTERY_TOPIC,
     ROBOT_EMERGENCY_TOPIC,
+    ROBOT_MISSION_RECOVERY_DONE_TOPIC,
     ROBOT_NAV2_FEEDBACK_TOPIC,
     ROBOT_NAV2_PATH_TOPIC,
     ROBOT_POSE_TOPIC,
@@ -33,11 +35,13 @@ class HandleMqttMessageUseCase:
         process_emergency_telemetry: ProcessEmergencyTelemetryUseCase,
         process_navigation_eta: ProcessNavigationEtaUseCase,
         process_robot_status_telemetry: ProcessRobotStatusTelemetryUseCase,
+        mission_orchestrator: MissionOrchestrator | None = None,
     ) -> None:
         self._process_battery_telemetry = process_battery_telemetry
         self._process_emergency_telemetry = process_emergency_telemetry
         self._process_navigation_eta = process_navigation_eta
         self._process_robot_status_telemetry = process_robot_status_telemetry
+        self._mission_orchestrator = mission_orchestrator
 
     def execute(self, topic: str, payload: dict[str, Any]) -> None:
         if topic == ROBOT_BATTERY_TOPIC:
@@ -58,6 +62,10 @@ class HandleMqttMessageUseCase:
 
         if topic == ROBOT_EMERGENCY_TOPIC:
             self._handle_emergency_payload(payload)
+            return
+
+        if topic == ROBOT_MISSION_RECOVERY_DONE_TOPIC:
+            self._handle_recovery_done_payload(payload)
             return
 
     def _handle_battery_payload(self, payload: dict[str, Any]) -> None:
@@ -112,3 +120,14 @@ class HandleMqttMessageUseCase:
             logger.warning("Payload d'urgence invalide recu: %s", exc)
             return
         self._process_emergency_telemetry.execute(emergency_request)
+
+    def _handle_recovery_done_payload(self, payload: dict[str, Any]) -> None:
+        if self._mission_orchestrator is None:
+            return
+        mission_id = payload.get("mission_id")
+        if not mission_id:
+            logger.warning("Payload recovery_done sans mission_id: %s", payload)
+            return
+        confirmed = self._mission_orchestrator.confirm_recovery_autonomous(str(mission_id))
+        if confirmed is None:
+            logger.info("recovery_done ignore (mission %s non en attente de recuperation)", mission_id)

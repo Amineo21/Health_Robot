@@ -17,6 +17,10 @@ ROBOT_POSE_TOPIC = "robot/pose"
 ROBOT_NAV_CANCEL_TOPIC = "robot/nav/cancel"
 ROBOT_NAV_PATH_DISPLAY_TOPIC = "robot/nav/path_display"
 
+# Recuperation autonome de la fourniture au point de stock (scan + bras).
+ROBOT_MISSION_RECOVERY_REQUEST_TOPIC = "robot/mission/recovery_request"  # backend -> robot
+ROBOT_MISSION_RECOVERY_DONE_TOPIC = "robot/mission/recovery_done"        # robot -> backend
+
 SUBSCRIPTION_TOPICS: tuple[tuple[str, int], ...] = (
     (ROBOT_BATTERY_TOPIC, 1),
     (ROBOT_STATUS_TOPIC, 0),
@@ -25,4 +29,5 @@ SUBSCRIPTION_TOPICS: tuple[tuple[str, int], ...] = (
     (ROBOT_NAV2_FEEDBACK_TOPIC, 0),
     (ROBOT_POSE_TOPIC, 0),
     (ROBOT_NAV_PATH_DISPLAY_TOPIC, 0),
+    (ROBOT_MISSION_RECOVERY_DONE_TOPIC, 1),
 )

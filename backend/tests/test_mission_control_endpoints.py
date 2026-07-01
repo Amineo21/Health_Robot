@@ -72,6 +72,55 @@ def test_mission_api_runs_create_arrive_confirm_complete_flow(
     assert delivery.json()["status"] == "COMPLETED"
 
 
+def test_robot_recovery_done_advances_mission_autonomously(
+    client: TestClient,
+    admin_token: str,
+    create_caregiver: Callable[[str], tuple[str, str, str]],
+) -> None:
+    client.post("/api/safety/emergency/reset", headers=auth_headers(admin_token))
+
+    stock = client.post(
+        "/api/annotated-points",
+        headers=auth_headers(admin_token),
+        json={"name": "Stock auto", "type": "STOCK", "x": 5.0, "y": 5.0, "yaw": 0.0},
+    )
+    stock_id = stock.json()["id"]
+    client.put(
+        f"/api/annotated-points/{stock_id}/supplies",
+        headers=auth_headers(admin_token),
+        json={"supplies": [{"supply_type": "linge", "priority_order": 1}]},
+    )
+    delivery_room = client.post(
+        "/api/annotated-points",
+        headers=auth_headers(admin_token),
+        json={"name": "Chambre 410", "type": "DELIVERY_ROOM", "x": 7.0, "y": 7.0, "yaw": 0.0},
+    )
+
+    _, email, password = create_caregiver()
+    caregiver_token = login(client, email, password)
+    mission_id = client.post(
+        "/api/missions",
+        headers=auth_headers(caregiver_token),
+        json={"supply_type": "linge", "delivery_room_id": delivery_room.json()["id"]},
+    ).json()["id"]
+
+    # Le robot arrive au stock -> la mission attend la recuperation.
+    use_cases = client.app.state.use_cases
+    use_cases.process_robot_status_telemetry.execute(
+        RobotRuntimeTelemetry(pose=RobotPose(x=5.0, y=5.0, yaw=0.0))
+    )
+    waiting = client.get("/api/missions", headers=auth_headers(caregiver_token)).json()[0]
+    assert waiting["status"] == "WAITING_FOR_RECOVERY_CONFIRMATION"
+
+    # Le robot signale lui-meme la recuperation (scan + bras) -> pas de bouton humain.
+    confirmed = use_cases.mission_orchestrator.confirm_recovery_autonomous(mission_id)
+    assert confirmed is not None
+    assert confirmed.status.value == "NAVIGATING_TO_DELIVERY"
+
+    # Un recovery_done en double / hors etat est ignore sans erreur.
+    assert use_cases.mission_orchestrator.confirm_recovery_autonomous(mission_id) is None
+
+
 def test_annotated_point_writes_are_admin_only(
     client: TestClient,
     create_caregiver: Callable[[str], tuple[str, str, str]],

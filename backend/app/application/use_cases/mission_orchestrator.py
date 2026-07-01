@@ -13,7 +13,11 @@ from app.domain.entities.mission import (
     SupplyType,
     utc_now,
 )
-from app.domain.entities.mqtt_topics import ROBOT_CMD_VEL_TOPIC, ROBOT_NAV_CANCEL_TOPIC
+from app.domain.entities.mqtt_topics import (
+    ROBOT_CMD_VEL_TOPIC,
+    ROBOT_MISSION_RECOVERY_REQUEST_TOPIC,
+    ROBOT_NAV_CANCEL_TOPIC,
+)
 from app.domain.entities.robot import RobotMode, RobotPose
 from app.domain.entities.robot_command import RobotCommand, RobotCommandType
 from app.domain.entities.user import User, UserRole
@@ -132,6 +136,7 @@ class MissionOrchestrator:
                     )
                 )
                 self._state_repository.set_mode(RobotMode.idle, mission_id=arrived.id)
+                self._request_robot_recovery(arrived)
                 return arrived
         elif mission.status == MissionStatus.navigating_to_delivery:
             if self._distance(pose.x, pose.y, mission.delivery_x_snapshot, mission.delivery_y_snapshot) <= self._arrival_radius_m:
@@ -150,13 +155,27 @@ class MissionOrchestrator:
         mission = self._get_mission_or_raise(mission_id)
         if mission.status != MissionStatus.waiting_for_recovery_confirmation:
             raise MissionTransitionError("Mission is not waiting for recovery confirmation")
+        return self._apply_recovery_confirmation(mission, confirmed_by_user_id=actor.id)
 
+    def confirm_recovery_autonomous(self, mission_id: str) -> Mission | None:
+        """Recuperation confirmee par le robot lui-meme (scan + bras au point de stock).
+
+        Appele depuis la reception MQTT de robot/mission/recovery_done. Tolerant :
+        si la mission n'existe plus ou n'attend pas de recuperation, on ignore
+        silencieusement (message en retard, mission annulee entre-temps...).
+        """
+        mission = self._missions.get_mission(mission_id)
+        if mission is None or mission.status != MissionStatus.waiting_for_recovery_confirmation:
+            return None
+        return self._apply_recovery_confirmation(mission, confirmed_by_user_id=None)
+
+    def _apply_recovery_confirmation(self, mission: Mission, confirmed_by_user_id: str | None) -> Mission:
         confirmed = self._missions.update_mission(
             replace(
                 mission,
                 status=MissionStatus.navigating_to_delivery,
                 recovery_confirmed_at=utc_now(),
-                recovery_confirmed_by_user_id=actor.id,
+                recovery_confirmed_by_user_id=confirmed_by_user_id,
             )
         )
         self._publish_navigation(confirmed, target="delivery")
@@ -258,6 +277,22 @@ class MissionOrchestrator:
     def _cancel_robot_navigation(self, mission_id: str) -> None:
         self._message_publisher.publish_json(ROBOT_NAV_CANCEL_TOPIC, {"mission_id": mission_id, "reason": "mission_cancelled"}, qos=1)
         self._message_publisher.publish_json(ROBOT_CMD_VEL_TOPIC, {"linear_x": 0, "angular_z": 0, "mission_id": mission_id}, qos=1)
+
+    def _request_robot_recovery(self, mission: Mission) -> None:
+        """Demande au robot d'executer la recuperation autonome au point de stock.
+
+        Le robot scanne la fourniture, la saisit avec le bras, puis repond sur
+        robot/mission/recovery_done -> confirm_recovery_autonomous().
+        """
+        self._message_publisher.publish_json(
+            ROBOT_MISSION_RECOVERY_REQUEST_TOPIC,
+            {
+                "mission_id": mission.id,
+                "supply_type": mission.supply_type.value,
+                "stock_point": mission.stock_point_name_snapshot,
+            },
+            qos=1,
+        )
 
     @staticmethod
     def _distance(x1: float, y1: float, x2: float, y2: float) -> float:

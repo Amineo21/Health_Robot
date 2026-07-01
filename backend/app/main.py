@@ -241,6 +241,7 @@ def create_app() -> FastAPI:
         process_emergency_telemetry=process_emergency_telemetry,
         process_navigation_eta=process_navigation_eta,
         process_robot_status_telemetry=process_robot_status_telemetry,
+        mission_orchestrator=mission_orchestrator,
     )
     mqtt_service.set_message_handler(handle_mqtt_message.execute)
 
