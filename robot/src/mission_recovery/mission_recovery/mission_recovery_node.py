@@ -4,13 +4,14 @@ Recuperation autonome de la fourniture au point de stock (M3 Pro).
 
 Ferme la boucle de mission cote robot :
   1. Le backend (orchestrateur de mission) detecte l'arrivee au point de stock
-     et publie sur MQTT robot/mission/recovery_request {mission_id, supply_type}.
-  2. Le MQTT bridge relaie ce message sur le topic ROS /robot/mission/recovery_request.
+     et publie robot/mission/recovery_request {mission_id, supply_type}.
+  2. Le pont rosbridge du backend le republie en ROS String sur
+     /robot/mission/recovery_request (meme canal que la navigation).
   3. Ce node SCANNE la fourniture (detections du object_detector_node sur
      /teacher/detections), puis joue une sequence de bras pour la SAISIR.
   4. Quand la fourniture est tenue, il publie /robot/mission/recovery_done
-     {mission_id, success} -> relaye en MQTT -> le backend confirme la
-     recuperation et relance la navigation vers la chambre de livraison.
+     {mission_id, success} -> le pont rosbridge le remonte au backend, qui
+     confirme la recuperation et relance la navigation vers la livraison.
 
 Aucune confirmation humaine n'est requise : c'est la partie "recuperation de
 fourniture" automatisee annoncee dans Docs/CONTEXT_MISSION.md.

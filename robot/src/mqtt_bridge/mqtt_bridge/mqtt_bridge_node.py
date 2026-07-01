@@ -19,16 +19,12 @@ MQTT_STATUS_TOPIC = "robot/status"          # robot → backend
 MQTT_BATTERY_TOPIC = "robot/battery"        # robot → backend
 MQTT_POSE_TOPIC = "robot/pose"              # robot → backend
 MQTT_PATH_DISPLAY_TOPIC = "robot/nav/path_display"  # robot → backend
-MQTT_RECOVERY_REQUEST_TOPIC = "robot/mission/recovery_request"  # backend → robot
-MQTT_RECOVERY_DONE_TOPIC = "robot/mission/recovery_done"        # robot → backend
 
 ROS_CMD_VEL_TOPIC = "/cmd_vel"
 ROS_STATUS_TOPIC = "/robot/nav/status"
 ROS_BATTERY_TOPIC = "/battery"
 ROS_AMCL_POSE_TOPIC = "/amcl_pose"
 ROS_PLAN_TOPIC = "/plan"
-ROS_RECOVERY_REQUEST_TOPIC = "/robot/mission/recovery_request"
-ROS_RECOVERY_DONE_TOPIC = "/robot/mission/recovery_done"
 
 
 class MqttBridgeNode(Node):
@@ -37,13 +33,11 @@ class MqttBridgeNode(Node):
 
         self._goal_pub = self.create_publisher(PoseStamped, '/goal_pose', 10)
         self._cmd_vel_pub = self.create_publisher(Twist, ROS_CMD_VEL_TOPIC, 10)
-        self._recovery_request_pub = self.create_publisher(String, ROS_RECOVERY_REQUEST_TOPIC, 10)
 
         self.create_subscription(String, ROS_STATUS_TOPIC, self._on_nav_status, 10)
         self.create_subscription(String, ROS_BATTERY_TOPIC, self._on_battery, 10)
         self.create_subscription(PoseWithCovarianceStamped, ROS_AMCL_POSE_TOPIC, self._on_amcl_pose, 10)
         self.create_subscription(Path, ROS_PLAN_TOPIC, self._on_plan, 10)
-        self.create_subscription(String, ROS_RECOVERY_DONE_TOPIC, self._on_recovery_done, 10)
 
         self._current_pose = {"x": 0.0, "y": 0.0}
 
@@ -70,7 +64,6 @@ class MqttBridgeNode(Node):
             client.subscribe(MQTT_GOAL_TOPIC, qos=1)
             client.subscribe(MQTT_CMD_VEL_TOPIC, qos=0)
             client.subscribe(MQTT_CANCEL_TOPIC, qos=1)
-            client.subscribe(MQTT_RECOVERY_REQUEST_TOPIC, qos=1)
         else:
             self.get_logger().warning(f"MQTT connexion refusée rc={rc}")
 
@@ -92,8 +85,6 @@ class MqttBridgeNode(Node):
             self._handle_cmd_vel(payload)
         elif topic == MQTT_CANCEL_TOPIC:
             self._handle_cancel()
-        elif topic == MQTT_RECOVERY_REQUEST_TOPIC:
-            self._handle_recovery_request(payload)
 
     def _handle_goal(self, payload: dict):
         """robot/nav/goal → /goal_pose vers Nav2."""
@@ -129,20 +120,6 @@ class MqttBridgeNode(Node):
         pose.pose.position.y = self._current_pose["y"]
         pose.pose.orientation.w = 1.0
         self._goal_pub.publish(pose)
-
-    def _handle_recovery_request(self, payload: dict):
-        """robot/mission/recovery_request → /robot/mission/recovery_request (node de récupération)."""
-        msg = String()
-        msg.data = json.dumps(payload)
-        self._recovery_request_pub.publish(msg)
-        self.get_logger().info(
-            f"Récupération demandée → mission {payload.get('mission_id', '?')}"
-        )
-
-    def _on_recovery_done(self, msg: String):
-        """Reçoit /robot/mission/recovery_done → publie robot/mission/recovery_done via MQTT."""
-        self._mqtt.publish(MQTT_RECOVERY_DONE_TOPIC, msg.data, qos=1)
-        self.get_logger().info("Récupération terminée → backend notifié")
 
     def _on_nav_status(self, msg: String):
         """Reçoit /robot/nav/status → publie sur robot/status via MQTT."""

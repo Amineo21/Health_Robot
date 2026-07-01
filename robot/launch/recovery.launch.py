@@ -5,8 +5,9 @@ Demarre les deux briques de l'etape "recuperation de fourniture" :
   - mission_recovery_node : sur requete du backend, saisit la fourniture au bras
                             puis signale /robot/mission/recovery_done
 
-A lancer en plus de la navigation (navigation.launch.py) et du pont MQTT
-(mqtt_bridge_node), qui relaie les topics de recuperation entre MQTT et ROS.
+A lancer en plus de la navigation et du rosbridge_server (deja lance pour la
+nav) : c'est le pont rosbridge du backend qui relaie /robot/mission/recovery_*
+entre le robot et le backend. Aucun node MQTT supplementaire n'est requis.
 """
 from launch import LaunchDescription
 from launch_ros.actions import Node

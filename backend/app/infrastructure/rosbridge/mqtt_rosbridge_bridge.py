@@ -20,16 +20,23 @@ from app.domain.entities.mqtt_topics import (
     ROBOT_COMMAND_TELEOP_TOPIC,
     ROBOT_COMMAND_TOPIC,
     ROBOT_EMERGENCY_TOPIC,
+    ROBOT_MISSION_RECOVERY_DONE_TOPIC,
+    ROBOT_MISSION_RECOVERY_REQUEST_TOPIC,
     ROBOT_NAV2_PATH_TOPIC,
     ROBOT_STATUS_TOPIC,
 )
 
 logger = logging.getLogger(__name__)
 
+# Recuperation autonome (scan + bras) relayee via le meme rosbridge que la nav.
+ROS_RECOVERY_REQUEST_TOPIC = "/robot/mission/recovery_request"  # backend -> robot
+ROS_RECOVERY_DONE_TOPIC = "/robot/mission/recovery_done"        # robot -> backend
+
 COMMAND_SUBSCRIPTIONS: tuple[tuple[str, int], ...] = (
     (f"{ROBOT_COMMAND_TOPIC}/#", 1),
     (ROBOT_COMMAND_TOPIC, 1),
     (ROBOT_ADMIN_TOPIC, 1),
+    (ROBOT_MISSION_RECOVERY_REQUEST_TOPIC, 1),
 )
 
 ROSBRIDGE_ADVERTISE_TOPICS: tuple[tuple[str, str], ...] = (
@@ -37,6 +44,7 @@ ROSBRIDGE_ADVERTISE_TOPICS: tuple[tuple[str, str], ...] = (
     ("/initialpose", "geometry_msgs/msg/PoseWithCovarianceStamped"),
     ("/cmd_vel", "geometry_msgs/msg/Twist"),
     ("/arm6_joints", "arm_msgs/msg/ArmJoints"),
+    (ROS_RECOVERY_REQUEST_TOPIC, "std_msgs/msg/String"),
 )
 
 ROSBRIDGE_SUBSCRIBE_TOPICS: tuple[tuple[str, str, int], ...] = (
@@ -48,6 +56,7 @@ ROSBRIDGE_SUBSCRIBE_TOPICS: tuple[tuple[str, str, int], ...] = (
     ("/odom", "nav_msgs/msg/Odometry", 500),
     ("/plan", "nav_msgs/msg/Path", 1000),
     ("/joint_states", "sensor_msgs/msg/JointState", 500),
+    (ROS_RECOVERY_DONE_TOPIC, "std_msgs/msg/String", 200),
 )
 
 JOINT_STATE_NAME_TO_INDEX = {
@@ -223,6 +232,10 @@ class MqttRosbridgeBridge:
             self._handle_admin_command(payload)
             return
 
+        if message.topic == ROBOT_MISSION_RECOVERY_REQUEST_TOPIC:
+            self._forward_recovery_request(payload)
+            return
+
         command_type, command_payload = parse_mqtt_command_payload(message.topic, payload)
         if command_type is None:
             return
@@ -270,6 +283,10 @@ class MqttRosbridgeBridge:
         topic = message.get("topic")
         ros_message = message.get("msg")
         if not isinstance(topic, str) or not isinstance(ros_message, dict):
+            return
+
+        if topic == ROS_RECOVERY_DONE_TOPIC:
+            self._forward_recovery_done(ros_message)
             return
 
         if topic == "/map":
@@ -386,6 +403,25 @@ class MqttRosbridgeBridge:
             qos=1,
             retain=True,
         )
+
+    def _forward_recovery_request(self, payload: dict[str, Any]) -> None:
+        """MQTT recovery_request -> String sur /robot/mission/recovery_request (robot)."""
+        self._send_rosbridge(
+            {
+                "op": "publish",
+                "topic": ROS_RECOVERY_REQUEST_TOPIC,
+                "msg": {"data": json.dumps(payload)},
+            }
+        )
+        logger.info("Recuperation demandee au robot: mission %s", payload.get("mission_id", "?"))
+
+    def _forward_recovery_done(self, ros_message: dict[str, Any]) -> None:
+        """String /robot/mission/recovery_done (robot) -> MQTT (handler mission confirme la suite)."""
+        data = ros_message.get("data")
+        if not isinstance(data, str):
+            return
+        self._mqtt_client.publish(ROBOT_MISSION_RECOVERY_DONE_TOPIC, data, qos=1)
+        logger.info("Recuperation terminee cote robot -> backend notifie")
 
     def _publish_goal_pose(self, x: float, y: float, yaw: float) -> None:
         self._send_rosbridge(

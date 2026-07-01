@@ -1,12 +1,22 @@
 from __future__ import annotations
 
+import json
 import math
 import time
+from types import SimpleNamespace
 
 import pytest
 
-from app.domain.entities.mqtt_topics import ROBOT_BATTERY_TOPIC, ROBOT_NAV2_PATH_TOPIC, ROBOT_STATUS_TOPIC
+from app.domain.entities.mqtt_topics import (
+    ROBOT_BATTERY_TOPIC,
+    ROBOT_MISSION_RECOVERY_DONE_TOPIC,
+    ROBOT_MISSION_RECOVERY_REQUEST_TOPIC,
+    ROBOT_NAV2_PATH_TOPIC,
+    ROBOT_STATUS_TOPIC,
+)
 from app.infrastructure.rosbridge.mqtt_rosbridge_bridge import (
+    ROS_RECOVERY_DONE_TOPIC,
+    ROS_RECOVERY_REQUEST_TOPIC,
     MqttRosbridgeBridge,
     build_goal_pose_message,
     build_initial_pose_message,
@@ -82,6 +92,43 @@ def test_repeated_teleop_commands_keep_only_latest_stop_timer(monkeypatch: pytes
     time.sleep(0.13)
 
     assert zero_burst_count == 1
+    bridge.stop()
+
+
+def test_recovery_request_mqtt_forwarded_to_rosbridge(monkeypatch: pytest.MonkeyPatch) -> None:
+    bridge = MqttRosbridgeBridge(settings=MinimalSettings())  # type: ignore[arg-type]
+    sent: list[dict] = []
+    monkeypatch.setattr(bridge, "_send_rosbridge", lambda payload: sent.append(payload) or True)
+
+    request = {"mission_id": "m-1", "supply_type": "linge", "stock_point": "Stock A"}
+    message = SimpleNamespace(
+        topic=ROBOT_MISSION_RECOVERY_REQUEST_TOPIC,
+        payload=json.dumps(request).encode("utf-8"),
+    )
+    bridge._handle_mqtt_message(bridge._mqtt_client, None, message)  # type: ignore[arg-type]
+
+    assert len(sent) == 1
+    assert sent[0]["op"] == "publish"
+    assert sent[0]["topic"] == ROS_RECOVERY_REQUEST_TOPIC
+    assert json.loads(sent[0]["msg"]["data"]) == request
+    bridge.stop()
+
+
+def test_recovery_done_rosbridge_republished_to_mqtt(monkeypatch: pytest.MonkeyPatch) -> None:
+    bridge = MqttRosbridgeBridge(settings=MinimalSettings())  # type: ignore[arg-type]
+    published: list[tuple] = []
+    monkeypatch.setattr(
+        bridge._mqtt_client, "publish", lambda topic, payload, qos=0: published.append((topic, payload, qos))
+    )
+
+    done_data = json.dumps({"mission_id": "m-1", "success": True})
+    raw = json.dumps({"op": "publish", "topic": ROS_RECOVERY_DONE_TOPIC, "msg": {"data": done_data}})
+    bridge._handle_rosbridge_message(None, raw)
+
+    assert len(published) == 1
+    topic, payload, _ = published[0]
+    assert topic == ROBOT_MISSION_RECOVERY_DONE_TOPIC
+    assert json.loads(payload) == {"mission_id": "m-1", "success": True}
     bridge.stop()
 
 
