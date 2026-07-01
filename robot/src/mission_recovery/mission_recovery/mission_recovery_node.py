@@ -72,8 +72,10 @@ class MissionRecoveryNode(Node):
         # Parametres ajustables (calibration bras / patience du scan)
         self.scan_timeout = float(self.declare_parameter("scan_timeout_sec", 8.0).value)
         self.state_dwell = float(self.declare_parameter("state_dwell_sec", 2.0).value)
-        # Topic du bras reel M3 Pro (le backend rosbridge avertit /arm6_joints).
-        self.arm_topic = self.declare_parameter("arm_command_topic", "/arm6_joints").value
+        # Topic du bras reel M3 Pro. Le node teacher pick_and_place (prouve sur
+        # le robot) publie des ArmJoints sur /arm_control -> meme topic ici.
+        # Surchargeable au lancement: -p arm_command_topic:=/arm6_joints.
+        self.arm_topic = self.declare_parameter("arm_command_topic", "/arm_control").value
 
         # Etat courant de la recuperation
         self.state = State.IDLE
